@@ -66,7 +66,8 @@ def layout():
                     with dmc.Text():
                         yield copyright()
                     with dmc.Anchor(
-                        href="http://github.com/yinchi/cuh-resp-model"
+                        href="http://github.com/yinchi/cuh-resp-model",
+                        target="_blank"
                     ):
                         yield DashIconify(icon="ion:logo-github", height=16)
                         yield f"{NBSP}Github"
