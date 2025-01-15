@@ -11,10 +11,11 @@ def theme_toggle():
     """Generate the theme toggle component."""
     return dmc.Switch(
         offLabel=DashIconify(
-            icon="radix-icons:sun", width=15, color=dmc.DEFAULT_THEME["colors"]["yellow"][8]
+            icon="material-symbols:light-mode-rounded",
+            width=15, color=dmc.DEFAULT_THEME["colors"]["yellow"][8]
         ),
         onLabel=DashIconify(
-            icon="radix-icons:moon",
+            icon="material-symbols:dark-mode-rounded",
             width=15,
             color=dmc.DEFAULT_THEME["colors"]["yellow"][6],
         ),

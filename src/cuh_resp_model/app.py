@@ -13,7 +13,7 @@ from .components.theme_toggle import theme_toggle
 
 _dash_renderer._set_react_version("18.2.0")  # pylint: disable=protected-access
 
-app = Dash(external_stylesheets=dmc.styles.ALL)
+app = Dash(external_stylesheets=dmc.styles.ALL, use_pages=True)
 
 
 COPY = html.unescape("&copy;")
@@ -37,7 +37,7 @@ def layout():
     with dmc.MantineProvider() as ret:
         with dmc.AppShell(
             None,
-            header={"height": "80"},
+            header={"height": "90"},
             padding="md",
         ):
             with dmc.AppShellHeader(None):
@@ -50,10 +50,27 @@ def layout():
                     with dmc.Group():
                         yield dmc.Image(src=dash.get_asset_url('logo-cuh.png'), h=80)
                         yield dmc.Title('CUH respiratory viruses modelling webapp')
-                    yield theme_toggle()
+                    with dmc.Group():
+                        with dmc.Menu(trigger="hover"):
+                            with dmc.MenuTarget(None):
+                                with dmc.Group(gap=0):
+                                    yield dmc.Text(f"Pages{NBSP}", fw=700)
+                                    yield DashIconify(
+                                        icon="material-symbols:keyboard-arrow-down-rounded")
+                            with dmc.MenuDropdown(None):
+                                with dmc.MenuItem(None, href='/', refresh=True):
+                                    with dmc.Center():
+                                        yield DashIconify(
+                                            icon="material-symbols:home-rounded", height=20)
+                                        yield f"{NBSP}{NBSP}Home"
+                                with dmc.MenuItem(None, href='/about'):
+                                    with dmc.Center():
+                                        yield DashIconify(
+                                            icon="material-symbols:help-outline", height=20)
+                                        yield f"{NBSP}{NBSP}About"
+                        yield theme_toggle()
             with dmc.AppShellMain(None):
-                with dmc.Stack(px="sm"):
-                    yield "Main"
+                yield dash.page_container
             with dmc.AppShellFooter(None):
                 with dmc.Group(
                     justify="space-between",
