@@ -39,8 +39,9 @@ def layout():
             None,
             header={"height": "90"},
             padding="md",
+            miw=1200
         ):
-            with dmc.AppShellHeader(None):
+            with dmc.AppShellHeader(None, miw=1200):
                 with dmc.Group(
                     justify="space-between",
                     style={"flex": 1},
@@ -50,28 +51,32 @@ def layout():
                     with dmc.Group():
                         yield dmc.Image(src=dash.get_asset_url('logo-cuh.png'), h=80)
                         yield dmc.Title('CUH respiratory viruses modelling webapp')
-                    with dmc.Group():
-                        with dmc.Menu(trigger="hover"):
-                            with dmc.MenuTarget(None):
-                                with dmc.Group(gap=0):
-                                    yield dmc.Text(f"Pages{NBSP}", fw=700)
+                    with dmc.Group(gap=0, align='flex-end'):
+                        # HACK: align with title text on left-side header group
+                        yield dmc.Title('.', opacity=0)
+                        with dmc.Group(gap="xl"):
+                            with dmc.Anchor(None, href='/', refresh=True, underline='never',
+                                            style={"color": "var(--mantine-color-text)"}):
+                                with dmc.Center():
                                     yield DashIconify(
-                                        icon="material-symbols:keyboard-arrow-down-rounded")
-                            with dmc.MenuDropdown(None):
-                                with dmc.MenuItem(None, href='/', refresh=True):
+                                        icon="material-symbols:home-rounded", height=20)
+                                    yield dmc.Text(f"{NBSP}{NBSP}Home", fw=700)
+                            with dmc.Menu(trigger="hover"):
+                                with dmc.MenuTarget(None):
                                     with dmc.Center():
+                                        yield dmc.Text(f"Pages{NBSP}", fw=700)
                                         yield DashIconify(
-                                            icon="material-symbols:home-rounded", height=20)
-                                        yield f"{NBSP}{NBSP}Home"
-                                with dmc.MenuItem(None, href='/about'):
-                                    with dmc.Center():
-                                        yield DashIconify(
-                                            icon="material-symbols:help-outline", height=20)
-                                        yield f"{NBSP}{NBSP}About"
-                        yield theme_toggle()
-            with dmc.AppShellMain(None):
+                                            icon="material-symbols:keyboard-arrow-down-rounded")
+                                with dmc.MenuDropdown(None):
+                                    with dmc.MenuItem(None, href='/about'):
+                                        with dmc.Center():
+                                            yield DashIconify(
+                                                icon="material-symbols:help-outline", height=20)
+                                            yield f"{NBSP}{NBSP}About"
+                            yield theme_toggle()
+            with dmc.AppShellMain(None, w=1200):
                 yield dash.page_container
-            with dmc.AppShellFooter(None):
+            with dmc.AppShellFooter(None, miw=1200):
                 with dmc.Group(
                     justify="space-between",
                     style={"flex": 1},
