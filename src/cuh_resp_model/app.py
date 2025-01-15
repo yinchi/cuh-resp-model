@@ -49,13 +49,13 @@ def layout():
                     px="md",
                 ):
                     with dmc.Group():
-                        yield dmc.Image(src=dash.get_asset_url('logo-cuh.png'), h=80)
-                        yield dmc.Title('CUH respiratory viruses modelling webapp')
-                    with dmc.Group(gap=0, align='flex-end'):
+                        yield dmc.Image(src=dash.get_asset_url("logo-cuh.png"), h=80)
+                        yield dmc.Title("CUH respiratory viruses modelling webapp")
+                    with dmc.Group(gap=0, align="flex-end"):
                         # HACK: align with title text on left-side header group
-                        yield dmc.Title('.', opacity=0)
+                        yield dmc.Title(".", opacity=0)
                         with dmc.Group(gap="xl"):
-                            with dmc.Anchor(None, href='/', refresh=True, underline='never',
+                            with dmc.Anchor(None, href="/", refresh=True, underline="never",
                                             style={"color": "var(--mantine-color-text)"}):
                                 with dmc.Center():
                                     yield DashIconify(
@@ -68,7 +68,7 @@ def layout():
                                         yield DashIconify(
                                             icon="material-symbols:keyboard-arrow-down-rounded")
                                 with dmc.MenuDropdown(None):
-                                    with dmc.MenuItem(None, href='/about'):
+                                    with dmc.MenuItem(None, href="/about"):
                                         with dmc.Center():
                                             yield DashIconify(
                                                 icon="material-symbols:help-outline", height=20)

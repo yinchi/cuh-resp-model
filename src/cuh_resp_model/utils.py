@@ -9,5 +9,5 @@ def read_file(path: PathLike, binary=False) -> str | bytes:
         with open(path, "rb") as f:
             return f.read()
     else:
-        with open(path, "r", encoding='utf-8') as f:
+        with open(path, "r", encoding="utf-8") as f:
             return f.read()
