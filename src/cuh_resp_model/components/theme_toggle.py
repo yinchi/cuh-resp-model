@@ -1,9 +1,13 @@
 """Dark theme toggle component for Dash Mantine."""
 
+from pathlib import Path
+
 import dash
 import dash_mantine_components as dmc
 from dash import Input, Output
 from dash_iconify import DashIconify
+
+from ..utils import read_file
 
 
 # region layout
@@ -29,13 +33,7 @@ def theme_toggle():
 
 # region callbacks
 dash.clientside_callback(
-    """\
-(switchOn) => {
-    document.documentElement.setAttribute(
-        'data-mantine-color-scheme', switchOn ? 'dark' : 'light');  
-    return window.dash_clientside.no_update
-}
-""",
+    read_file(Path(__file__).parent.resolve() / "theme_toggle.js"),
     Output("color-scheme-toggle", "id"),
     Input("color-scheme-toggle", "checked"),
 )
