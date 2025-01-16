@@ -81,6 +81,14 @@ def layout():
                 with dmc.Card():
                     with dmc.Stack(gap="xl"):
                         yield dmc.Text("Step 2: Analysis & Model Creation", ta="center", size="xl")
+                        with dmc.Tabs(None, value="arrivals"):
+                            with dmc.TabsList(None):
+                                yield dmc.TabsTab("Daily arrivals", value="arrivals")
+                                yield dmc.TabsTab("Length-of-stay", value="los")
+                            with dmc.TabsPanel(None, value="arrivals"):
+                                yield "Daily arrivals"
+                            with dmc.TabsPanel(None, value="los"):
+                                yield "Length-of-stay"
                         yield back_next(ID_STEPPER_BTN_1_TO_0, ID_STEPPER_BTN_1_TO_2)
             with dmc.StepperStep(
                 None,
