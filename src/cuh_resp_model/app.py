@@ -61,18 +61,12 @@ def layout():
                                     yield DashIconify(
                                         icon="material-symbols:home-rounded", height=20)
                                     yield dmc.Text(f"{NBSP}{NBSP}Home", fw=700)
-                            with dmc.Menu(trigger="hover"):
-                                with dmc.MenuTarget(None):
-                                    with dmc.Center():
-                                        yield dmc.Text(f"Pages{NBSP}", fw=700)
-                                        yield DashIconify(
-                                            icon="material-symbols:keyboard-arrow-down-rounded")
-                                with dmc.MenuDropdown(None):
-                                    with dmc.MenuItem(None, href="/about"):
-                                        with dmc.Center():
-                                            yield DashIconify(
-                                                icon="material-symbols:help-outline", height=20)
-                                            yield f"{NBSP}{NBSP}About"
+                            with dmc.Anchor(None, href="/about", underline="never",
+                                            style={"color": "var(--mantine-color-text)"}):
+                                with dmc.Center():
+                                    yield DashIconify(
+                                        icon="material-symbols:help-outline", height=20)
+                                    yield dmc.Text(f"{NBSP}{NBSP}About", fw=700)
                             yield theme_toggle()
             with dmc.AppShellMain(None, w=1200):
                 yield dash.page_container
