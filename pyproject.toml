@@ -8,6 +8,7 @@ dependencies = [
     "dash-compose>=2023.3.12",
     "dash-iconify>=0.1.2,<0.2",
     "dash-mantine-components>=0.15.1,<0.16",
+    "humanize>=4.11.0",
 ]
 
 [dependency-groups]

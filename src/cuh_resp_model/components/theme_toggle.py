@@ -32,7 +32,7 @@ def theme_toggle():
 
 # region callbacks
 clientside_callback(
-    read_file(Path(__file__).parent.resolve() / "theme_toggle.js"),
+    read_file(Path(__file__).parent.resolve() / "js/theme_toggle.js"),
     Output("color-scheme-toggle", "id"),
     Input("color-scheme-toggle", "checked"),
 )

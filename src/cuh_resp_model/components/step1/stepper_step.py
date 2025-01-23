@@ -1,10 +1,12 @@
 """Main module for Step 1 of the stepper: Upload files."""
 
+from base64 import b64decode
 from pathlib import Path
 import dash
 from dash_compose import composition
 import dash_mantine_components as dmc
 from dash import callback, clientside_callback, Input, Output, State
+import humanize
 
 from cuh_resp_model.components.ids import (
     ID_STEPPER,
@@ -24,6 +26,9 @@ from cuh_resp_model.utils import read_file
 
 from ..back_next import back_next
 from ..upload_box import upload_box
+
+
+INITIAL_PROMPT = "Upload .xlsx (click or drag-and-drop)"
 
 
 @composition
@@ -50,35 +55,74 @@ def stack():
     with dmc.Stack(gap=24) as ret:
         yield dmc.TextInput(
             label="Name of respiratory illness",
-            _id=ID_INPUT_RESP_NAME,
+            id=ID_INPUT_RESP_NAME,
             placeholder="E.g., COVID, influenza, RSV"
         )
         yield upload_box(
             label="Historical patient stay data:",
-            _id=ID_PATIENT_FILE_UPLOAD,
+            id=ID_PATIENT_FILE_UPLOAD,
             prompt_id=ID_PATIENT_FILE_PROMPT,
-            initial_prompt="Upload .xlsx (click or drag-and-drop)"
+            initial_prompt=INITIAL_PROMPT
         )
         yield upload_box(
             label="Historical occupancy data:",
-            _id=ID_OCCUPANCY_FILE_UPLOAD,
+            id=ID_OCCUPANCY_FILE_UPLOAD,
             prompt_id=ID_OCCUPANCY_FILE_PROMPT,
-            initial_prompt="Upload .xlsx (click or drag-and-drop)"
+            initial_prompt=INITIAL_PROMPT
         )
     return ret
 
 
 # region callbacks
 
+CHECK_TEXTBOX_EMPTY = read_file(Path(__file__).parent.resolve() / "../js/check_textbox_empty.js")
+
 # Triggered when textbox is changed or Next button is pressed.
 # Display error message if textbox is empty.
 clientside_callback(
-    read_file(Path(__file__).parent.resolve() / "../check_textbox_empty.js"),
+    CHECK_TEXTBOX_EMPTY,
     Output(ID_INPUT_RESP_NAME, 'error', allow_duplicate=True),
     Input(ID_INPUT_RESP_NAME, 'value'),
     Input(ID_STEPPER_BTN_0_TO_1, "n_clicks"),
     prevent_initial_call=True
 )
+
+
+@callback(
+    Output(ID_PATIENT_FILE_PROMPT, 'children'),
+    Output(ID_PATIENT_FILE_PROMPT, 'c'),
+    Input(ID_PATIENT_FILE_UPLOAD, 'contents'),
+    State(ID_PATIENT_FILE_UPLOAD, 'filename'),
+    prevent_initial_call=True
+)
+def show_file_details_patient(contents, filename):
+    return show_file_details(contents, filename)
+
+
+@callback(
+    Output(ID_OCCUPANCY_FILE_PROMPT, 'children'),
+    Output(ID_OCCUPANCY_FILE_PROMPT, 'c'),
+    Input(ID_OCCUPANCY_FILE_UPLOAD, 'contents'),
+    State(ID_OCCUPANCY_FILE_UPLOAD, 'filename'),
+    prevent_initial_call=True
+)
+def show_file_details_occupancy(contents, filename):
+    return show_file_details(contents, filename)
+
+
+def show_file_details(contents: str | None, filename: str):
+    """Show status message after file is uploaded."""
+    if contents is None:
+        return INITIAL_PROMPT, "var(--text-color)"
+    if not filename:
+        filename = "upload.xlsx"
+    _, content_string = contents.split(',')
+    decoded = b64decode(content_string)
+    filesize = humanize.naturalsize(len(decoded))
+    return (
+        f"✅ Uploaded \"{filename}\" ({filesize}). Click or drop file here to change. ✅",
+        "var(--mantine-color-green-text)"
+    )
 
 
 @callback(

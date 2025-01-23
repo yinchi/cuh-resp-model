@@ -8,7 +8,7 @@ import dash_mantine_components as dmc
 @composition
 def upload_box(
     label: str,
-    _id: str,
+    id: str,
     prompt_id: str,
     initial_prompt: str
 ):
@@ -16,7 +16,7 @@ def upload_box(
     with dmc.Stack(gap=0) as ret:
         yield label
         with dcc.Upload(
-            id=_id,
+            id=id,
             accept='.xlsx'
         ):
             with dmc.Box(
