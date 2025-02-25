@@ -1,5 +1,8 @@
 """Dash component IDs."""
 
+#
+ID_DARK_MODE_TOGGLE = "dark-mode-toggle"
+
 # Stepper DMC element
 ID_STEPPER = "stepper"
 
@@ -18,3 +21,6 @@ ID_PATIENT_FILE_UPLOAD = "step1-input-patient-file"
 ID_PATIENT_FILE_PROMPT = "step1-input-patient-file-prompt"
 ID_OCCUPANCY_FILE_UPLOAD = "step1-input-occupancy-file"
 ID_OCCUPANCY_FILE_PROMPT = "step1-input-occupancy-file-prompt"
+
+# Step 2 display components
+ID_GRAPH_ARR = {'themed_graph': True, 'name': 'step2-graph-arr'}
