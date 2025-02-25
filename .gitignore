@@ -12,3 +12,7 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Protect possibly private data
+data/
+!data/public
