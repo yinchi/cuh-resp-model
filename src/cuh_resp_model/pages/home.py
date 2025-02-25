@@ -39,7 +39,7 @@ def layout():
                                 yield dmc.TabsTab("Daily arrivals", value="arrivals")
                                 yield dmc.TabsTab("Length-of-stay", value="los")
                             with dmc.TabsPanel(None, value="arrivals"):
-                                yield "Daily arrivals"
+                                yield step2.arr()
                             with dmc.TabsPanel(None, value="los"):
                                 yield "Length-of-stay"
                         yield back_next(ID_STEPPER_BTN_1_TO_0, ID_STEPPER_BTN_1_TO_2)
