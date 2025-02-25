@@ -6,7 +6,8 @@ import dash_mantine_components as dmc
 from dash import clientside_callback, Input, Output
 from dash_iconify import DashIconify
 
-from cuh_resp_model.utils import read_file
+from cuh_resp_model.components.ids import ID_DARK_MODE_TOGGLE
+from cuh_resp_model.utils import JSCode, read_file
 
 
 # region layout
@@ -22,7 +23,7 @@ def theme_toggle():
             width=15,
             color=dmc.DEFAULT_THEME["colors"]["yellow"][6],
         ),
-        id="color-scheme-toggle",
+        id=ID_DARK_MODE_TOGGLE,
         persistence=True,
         color="grey",
         size="lg"

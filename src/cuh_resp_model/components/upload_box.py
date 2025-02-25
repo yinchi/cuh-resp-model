@@ -1,8 +1,8 @@
 """A file upload component."""
 
+import dash_mantine_components as dmc
 from dash import dcc
 from dash_compose import composition
-import dash_mantine_components as dmc
 
 
 @composition

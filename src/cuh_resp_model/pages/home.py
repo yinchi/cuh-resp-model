@@ -5,16 +5,10 @@ import dash_mantine_components as dmc
 from dash import Input, Output, State, callback, dcc
 from dash_compose import composition
 
-from cuh_resp_model.components.ids import (
-    ID_STEPPER,
-    ID_STEPPER_BTN_1_TO_2,
-    ID_STEPPER_BTN_2_TO_1,
-    ID_STEPPER_BTN_1_TO_0,
-
-    ID_STORE_APPDATA
-)
-from cuh_resp_model.components import step1
+from cuh_resp_model.components import step1, step2
 from cuh_resp_model.components.back_next import back_next
+from cuh_resp_model.components.ids import (ID_STEPPER, ID_STEPPER_BTN_1_TO_0, ID_STEPPER_BTN_1_TO_2,
+                                           ID_STEPPER_BTN_2_TO_1, ID_STORE_APPDATA)
 
 dash.register_page(__name__, path="/")
 
@@ -30,7 +24,7 @@ def layout():
             None, id=ID_STEPPER, active=0,
             allowNextStepsSelect=False
         ):
-            yield step1.step()
+            yield step1.stepper_step()
             with dmc.StepperStep(
                 None,
                 label="Analysis",

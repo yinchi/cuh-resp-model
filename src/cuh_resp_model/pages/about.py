@@ -7,6 +7,7 @@ from dash_compose import composition
 
 dash.register_page(__name__, path='/about')
 
+
 @composition
 def layout():
     """App layout using Dash Compose."""

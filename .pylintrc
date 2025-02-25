@@ -1,0 +1,10 @@
+[MAIN]
+
+ignore=.venv,test
+
+[MESSAGES CONTROL]
+
+disable=too-many-arguments,
+        too-many-positional-arguments,
+        too-many-locals,
+        bare-except

@@ -1,9 +1,10 @@
 """Back/next button control."""
 
 from html import unescape
-from dash_compose import composition
-from dash import html
+
 import dash_mantine_components as dmc
+from dash import html
+from dash_compose import composition
 
 from cuh_resp_model.utils import drop_none
 
