@@ -7,4 +7,6 @@ ignore=.venv,test
 disable=too-many-arguments,
         too-many-positional-arguments,
         too-many-locals,
-        bare-except
+        bare-except,
+        wildcard-import,
+        unused-wildcard-import

@@ -7,10 +7,13 @@ ID_DARK_MODE_TOGGLE = "dark-mode-toggle"
 ID_STEPPER = "stepper"
 
 # Stepper buttons
-ID_STEPPER_BTN_0_TO_1 = "stepper-btn-0-to-1"
 ID_STEPPER_BTN_1_TO_2 = "stepper-btn-1-to-2"
+ID_STEPPER_BTN_2_TO_3 = "stepper-btn-2-to-3"
+ID_STEPPER_BTN_3_TO_4 = "stepper-btn-3-to-4"
+
+ID_STEPPER_BTN_4_TO_3 = "stepper-btn-4-to-3"
+ID_STEPPER_BTN_3_TO_2 = "stepper-btn-3-to-2"
 ID_STEPPER_BTN_2_TO_1 = "stepper-btn-2-to-1"
-ID_STEPPER_BTN_1_TO_0 = "stepper-btn-1-to-0"
 
 # Main data store for app
 ID_STORE_APPDATA = "store-appdata"
@@ -24,3 +27,8 @@ ID_OCCUPANCY_FILE_PROMPT = "step1-input-occupancy-file-prompt"
 
 # Step 2 display components
 ID_GRAPH_ARR = {'themed_graph': True, 'name': 'step2-graph-arr'}
+ID_POISSON_DATEPICKER = 'step2-datepicker-poisson-fitter'
+ID_POISSON_BUTTON_FIT = 'step2-btn-fit-poisson'
+ID_POISSON_PEAK_DATE = 'step2-datepicker-poisson-offset'
+ID_POISSON_PEAK = 'step2-numinput-arr-peak'
+ID_POISSON_XSCALE = 'step2-numinput-arr-xscale'

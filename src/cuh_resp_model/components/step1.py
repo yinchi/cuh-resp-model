@@ -12,10 +12,7 @@ import pandas as pd
 from dash import Input, Output, State, callback, clientside_callback
 from dash_compose import composition
 
-from cuh_resp_model.components.ids import (ID_INPUT_RESP_NAME, ID_OCCUPANCY_FILE_PROMPT,
-                                           ID_OCCUPANCY_FILE_UPLOAD, ID_PATIENT_FILE_PROMPT,
-                                           ID_PATIENT_FILE_UPLOAD, ID_STEPPER,
-                                           ID_STEPPER_BTN_0_TO_1, ID_STORE_APPDATA)
+from cuh_resp_model.components.ids import *
 from cuh_resp_model.utils import JSCode, read_file
 
 from .back_next import back_next
@@ -26,7 +23,7 @@ INITIAL_PROMPT = "Upload .xlsx (click or drag-and-drop)"
 
 @composition
 def stepper_step():
-    """The contents for the current stepper step."""
+    """The contents for the Stepper Step 1 in the app."""
 
     with dmc.StepperStep(
         None,
@@ -38,7 +35,7 @@ def stepper_step():
             with dmc.Stack(gap="xl"):
                 yield dmc.Text("Step 1: Upload Files", ta="center", size="xl")
                 yield stack()
-                yield back_next(None, ID_STEPPER_BTN_0_TO_1)
+                yield back_next(None, ID_STEPPER_BTN_1_TO_2)
     return ret
 
 
@@ -67,6 +64,43 @@ def stack():
 
 
 # region callbacks
+#
+@callback(
+    Output(ID_STEPPER, 'active', allow_duplicate=True),
+    Output(ID_STORE_APPDATA, 'data', allow_duplicate=True),
+    Input(ID_STEPPER_BTN_1_TO_2, 'n_clicks'),
+    State(ID_INPUT_RESP_NAME, 'value'),
+    State(ID_PATIENT_FILE_UPLOAD, 'contents'),
+    State(ID_OCCUPANCY_FILE_UPLOAD, 'contents'),
+    prevent_initial_call=True
+)
+def stepper_next(_,
+                 disease_name: str,
+                 patient_file_contents: str,
+                 occupancy_file_contents: str):
+    """Process app data for Step 1 and proceed to Step 2."""
+
+    los_data, arr_data = get_los_data(to_bytesio(patient_file_contents))
+    occupancy_data = get_occupancy_data(to_bytesio(occupancy_file_contents))
+
+    # Data to save in app storage
+    new_data = {
+        "completed": 1,
+        "step_1": {
+            "disease_name": disease_name,
+            "los_data": los_data,
+            "arr_data": arr_data,
+            "occupancy_data": occupancy_data
+        }
+    }
+
+    # Validate inputs
+    if not disease_name:
+        return dash.no_update, dash.no_update
+
+    # Go to next step in Stepper (subtract 1 as 0-based) and save computed data so far
+    return 1, new_data
+
 
 CHECK_TEXTBOX_EMPTY: JSCode = read_file(
     Path(__file__).parent.resolve() / "js/check_textbox_empty.js")
@@ -77,7 +111,7 @@ clientside_callback(
     CHECK_TEXTBOX_EMPTY,
     Output(ID_INPUT_RESP_NAME, 'error', allow_duplicate=True),
     Input(ID_INPUT_RESP_NAME, 'value'),
-    Input(ID_STEPPER_BTN_0_TO_1, "n_clicks"),
+    Input(ID_STEPPER_BTN_1_TO_2, "n_clicks"),
     prevent_initial_call=True
 )
 
@@ -119,47 +153,12 @@ def show_file_details(contents: str | None, filename: str):
         f"✅ Uploaded \"{filename}\" ({filesize}). Click or drop file here to change. ✅",
         "var(--mantine-color-green-text)"
     )
-
-
-@callback(
-    Output(ID_STEPPER, 'active', allow_duplicate=True),
-    Output(ID_STORE_APPDATA, 'data', allow_duplicate=True),
-    Input(ID_STEPPER_BTN_0_TO_1, 'n_clicks'),
-    State(ID_INPUT_RESP_NAME, 'value'),
-    State(ID_PATIENT_FILE_UPLOAD, 'contents'),
-    State(ID_OCCUPANCY_FILE_UPLOAD, 'contents'),
-    prevent_initial_call=True
-)
-def stepper_next_1(_,
-                   disease_name: str,
-                   patient_file_contents: str,
-                   occupancy_file_contents: str):
-    """Process app data for Step 1 (0 internally) and proceed to Step 2 (1 internally)."""
-
-    los_data, arr_data = get_los_data(to_bytesio(patient_file_contents))
-    occupancy_data = get_occupancy_data(to_bytesio(occupancy_file_contents))
-
-    # Data to save in app storage
-    new_data = {
-        "completed": 1,
-        "step_1": {
-            "disease_name": disease_name,
-            "los_data": los_data,
-            "arr_data": arr_data,
-            "occupancy_data": occupancy_data
-        }
-    }
-
-    # Validate inputs
-    if not disease_name:
-        return dash.no_update, dash.no_update
-
-    # Go to next step in Stepper
-    return 1, new_data
+#
 # endregion
 
 
 # region helpers
+#
 def to_bytesio(file_contents: str) -> BytesIO:
     """Convert Dash Upload bytes to an Excel file object."""
     _, content_string = file_contents.split(',')
@@ -216,5 +215,5 @@ def get_occupancy_data(file: BytesIO) -> dict:
     """
     data = pd.read_excel(file, usecols='A:C')
     return data.set_index('Date').to_dict('tight')
-
+#
 # endregion
