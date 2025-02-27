@@ -102,6 +102,15 @@ def stepper_next(_,
     return 1, new_data
 
 
+clientside_callback(
+    """(d, c1, c2) => (!d || !c1 || !c2)""",
+    Output(ID_STEPPER_BTN_1_TO_2, 'disabled'),
+    Input(ID_INPUT_RESP_NAME, 'value'),
+    Input(ID_PATIENT_FILE_UPLOAD, 'contents'),
+    Input(ID_OCCUPANCY_FILE_UPLOAD, 'contents'),
+)
+
+
 CHECK_TEXTBOX_EMPTY: JSCode = read_file(
     Path(__file__).parent.resolve() / "js/check_textbox_empty.js")
 """Triggered when textbox is changed or Next button is pressed.
