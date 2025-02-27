@@ -8,6 +8,7 @@ import dash_mantine_components as dmc
 import pandas as pd
 from dash import Input, Output, Patch, State, callback, dcc, no_update
 from dash_compose import composition
+from dash_iconify import DashIconify
 from plotly import graph_objects as go
 
 from cuh_resp_model.components.ids import *
@@ -79,6 +80,11 @@ def poisson_fitter():
                 'Fit Poisson curve',
                 id=ID_POISSON_BUTTON_FIT
             )
+            with dmc.Group(gap=0):
+                yield DashIconify(icon="material-symbols:warning-rounded", width=24,
+                                  color=dmc.DEFAULT_THEME["colors"]["yellow"][5])
+                yield dmc.Text(' Note: This will replace the horizontal scale and minimum '
+                           'value parameters below.')
     return ret
 
 
@@ -86,7 +92,7 @@ def poisson_fitter():
 def poisson_controls():
     """dmc.Group for creating a patient arrival scenario from a Poisson curve."""
     with dmc.Stack() as ret:
-        yield dmc.Text('Scenario parmeters', fw=700)
+        yield dmc.Text('Scenario parameters', size='xl', fw=700)
         with dmc.Group(gap='md', align='flex-end'):
             yield dmc.DatePickerInput(
                 id=ID_POISSON_PEAK_DATE,
@@ -111,6 +117,24 @@ def poisson_controls():
                 allowNegative=False,
                 hideControls=True,
                 w=200,
+            )
+            yield dmc.NumberInput(
+                id=ID_POISSON_MIN,
+                label='Minimum value',
+                value=0,
+                allowNegative=False,
+                hideControls=True,
+                w=200,
+            )
+        with dmc.Group(gap='md', align='flex-end'):
+            yield dmc.DatePickerInput(
+                id=ID_SCENARIO_DATES,
+                label='Scenario date range',
+                type="range",
+                value=[date(2024, 12, 1), date(2025, 2, 1)],
+                numberOfColumns=2,
+                valueFormat="YYYY-MM-DD",
+                w=250
             )
     return ret
 
