@@ -22,6 +22,12 @@ def stepper_step():
         with dmc.Card():
             with dmc.Stack(gap="xl"):
                 yield dmc.Text("Step 3: Patient Length-of-Stay Modelling", ta="center", size="xl")
+                with dmc.Card(withBorder=True):
+                    yield dmc.Text('0-15 Age group', size='xl', fw=700)
+                with dmc.Card(withBorder=True):
+                    yield dmc.Text('16-64 Age group', size='xl', fw=700)
+                with dmc.Card(withBorder=True):
+                    yield dmc.Text('65+ Age group', size='xl', fw=700)
                 yield back_next(ID_STEPPER_BTN_3_TO_2, ID_STEPPER_BTN_3_TO_4)
     return ret
 
