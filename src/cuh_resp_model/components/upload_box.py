@@ -8,7 +8,7 @@ from dash_compose import composition
 @composition
 def upload_box(
     label: str,
-    id: str,
+    _id: str,
     prompt_id: str,
     initial_prompt: str
 ):
@@ -16,7 +16,7 @@ def upload_box(
     with dmc.Stack(gap=0) as ret:
         yield label
         with dcc.Upload(
-            id=id,
+            id=_id,
             accept='.xlsx'
         ):
             with dmc.Box(

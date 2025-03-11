@@ -84,7 +84,7 @@ def poisson_fitter():
                 yield DashIconify(icon="material-symbols:warning-rounded", width=24,
                                   color=dmc.DEFAULT_THEME["colors"]["yellow"][5])
                 yield dmc.Text(' Note: This will replace the horizontal scale and minimum '
-                           'value parameters below.')
+                               'value parameters below.')
     return ret
 
 
@@ -138,10 +138,9 @@ def poisson_controls():
             )
     return ret
 
+
 # region callbacks
 #
-
-
 @callback(
     Output(ID_STEPPER, "active", allow_duplicate=True),
     Input(ID_STEPPER_BTN_2_TO_1, "n_clicks"),

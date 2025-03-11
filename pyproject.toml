@@ -26,3 +26,41 @@ dev = [
     "matplotlib>=3.10.0",
     "pylint>=3.3.3,<4",
 ]
+
+[tool.autopep8]
+max_line_length = 100
+in-place = true
+recursive = true
+
+[tool.isort]
+line_length = 100
+
+[tool.pylint.main]
+
+# Files or directories to be skipped. They should be base names, not paths.
+ignore = [".venv", "test"]
+
+# Use multiple processes to speed up Pylint. Specifying 0 will auto-detect the
+# number of processors available to use, and will cap the count on Windows to
+# avoid hangs.
+jobs = 8
+
+
+[tool.pylint.basic]
+
+# Good variable names which should always be accepted, separated by a comma.
+good-names = ["i", "j", "k", "ex", "Run", "_"]
+
+# Maximum number of characters on a single line.
+max-line-length = 100
+
+[tool.pylint."messages control"]
+
+# Disable the message, report, category or checker with the given id(s).
+disable = [
+    "too-many-arguments",
+    "too-many-positional-arguments",
+    "too-many-locals",
+    "bare-except",
+    "wildcard-import",
+    "unused-wildcard-import"]

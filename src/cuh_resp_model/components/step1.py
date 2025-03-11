@@ -50,13 +50,13 @@ def stack():
         )
         yield upload_box(
             label="Historical patient stay data:",
-            id=ID_PATIENT_FILE_UPLOAD,
+            _id=ID_PATIENT_FILE_UPLOAD,
             prompt_id=ID_PATIENT_FILE_PROMPT,
             initial_prompt=INITIAL_PROMPT
         )
         yield upload_box(
             label="Historical occupancy data:",
-            id=ID_OCCUPANCY_FILE_UPLOAD,
+            _id=ID_OCCUPANCY_FILE_UPLOAD,
             prompt_id=ID_OCCUPANCY_FILE_PROMPT,
             initial_prompt=INITIAL_PROMPT
         )

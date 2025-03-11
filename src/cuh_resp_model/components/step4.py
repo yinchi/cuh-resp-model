@@ -1,6 +1,5 @@
 """Module for the Daily Arrivals tab of Step 3: Patient Length-of-Stay Modelling"""
 
-import dash
 import dash_mantine_components as dmc
 from dash import Input, Output, State, callback
 from dash_compose import composition
