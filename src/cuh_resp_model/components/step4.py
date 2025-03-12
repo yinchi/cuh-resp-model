@@ -35,6 +35,6 @@ def stepper_back(_, curr_state):
     """Go back to Step 3: Patient Length-of-Stay Modelling.
 
     This will clear all progress in Step 4 (deferred until user clicks Next in Step 3)."""
-    return curr_state-1
+    return curr_state - 1
 #
 # endregion

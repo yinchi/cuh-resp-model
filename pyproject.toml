@@ -64,5 +64,6 @@ disable = [
     "too-many-positional-arguments",
     "too-many-locals",
     "bare-except",
+    "broad-exception-caught",
     "wildcard-import",
     "unused-wildcard-import"]

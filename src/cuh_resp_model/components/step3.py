@@ -44,7 +44,7 @@ def stepper_back(_, curr_state):
     """Go back to Step 2: Patient Arrival Modelling.
 
     This will clear all progress in Step 3 (deferred until user clicks Next in Step 2)."""
-    return curr_state-1
+    return curr_state - 1
 
 
 @callback(
@@ -57,6 +57,6 @@ def stepper_back(_, curr_state):
 )
 def stepper_next(_, data, curr_state):
     """Process app data for Step 2 and proceed to Step 3."""
-    return curr_state+1, dash.no_update
+    return curr_state + 1, dash.no_update
 #
 # endregion
