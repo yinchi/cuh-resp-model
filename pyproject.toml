@@ -16,6 +16,7 @@ dependencies = [
     "nbformat>=5.10.4",
     "openpyxl>=3.1.5",
     "pandas>=2.2.3",
+    "scipy>=1.15.2",
 ]
 
 [dependency-groups]
@@ -31,6 +32,7 @@ dev = [
 max_line_length = 100
 in-place = true
 recursive = true
+aggressive = 1
 
 [tool.isort]
 line_length = 100

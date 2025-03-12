@@ -30,7 +30,6 @@ ID_GRAPH_ARR = {'themed_graph': True, 'name': 'step2-graph-arr'}
 ID_POISSON_DATEPICKER = 'step2-datepicker-poisson-fitter'
 ID_POISSON_BUTTON_FIT = 'step2-btn-fit-poisson'
 ID_POISSON_PEAK_DATE = 'step2-datepicker-poisson-offset'
-ID_POISSON_FIT_RESULT_TXT = 'step2-text-poisson-result'
 ID_POISSON_PEAK = 'step2-numinput-arr-peak'
 ID_POISSON_XSCALE = 'step2-numinput-arr-xscale'
 ID_POISSON_MIN = 'step2-numinput-arr-min'
