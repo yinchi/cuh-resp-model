@@ -1,5 +1,6 @@
 """Module for the Daily Arrivals tab of Step 2: Patient Arrival Modelling"""
 
+from copy import deepcopy
 from datetime import date, timedelta
 
 import dash
@@ -161,11 +162,49 @@ def stepper_back(_, curr_state):
     Input(ID_STEPPER_BTN_2_TO_3, "n_clicks"),
     State(ID_STORE_APPDATA, "data"),
     State(ID_STEPPER, "active"),
+    State(ID_SCENARIO_DATES, 'value'),
+    State(ID_POISSON_PEAK_DATE, 'value'),
+    State(ID_POISSON_XSCALE, 'value'),
+    State(ID_POISSON_PEAK, 'value'),
+    State(ID_POISSON_MIN, 'value'),
     prevent_initial_call=True
 )
-def stepper_next(_, data, curr_state):
+def stepper_next(_, data, curr_state, scenario_dates, loc, x_scale, y_max, y_min):
     """Process app data for Step 2 and proceed to Step 3."""
-    return curr_state + 1, dash.no_update
+
+    # Error handling -- this should not trigger, so just return no_update and
+    # don't worry about showing error messages
+    if not scenario_dates or not loc:
+        return no_update, no_update
+
+    try:
+        x_scale = float(x_scale)
+        y_max = float(y_max)
+        y_min = float(y_min)
+        if x_scale <= 0:
+            return no_update, no_update
+    except BaseException:
+        return no_update, no_update
+    
+    xs = [x.date() for x in pd.date_range(*scenario_dates)]
+    ys = [norm_curve2(days(x, date.fromisoformat(loc)), x_scale, y_max, y_min) for x in xs]
+    
+    step2_data = {
+        'scenario_start': pd.Timestamp(scenario_dates[0]).isoformat(),
+        'scenario_end': pd.Timestamp(scenario_dates[1]).isoformat(),
+        'peak_date': pd.Timestamp(loc).isoformat(),
+        'peak_value': y_max,
+        'min_value': y_min,
+        'x_scale': x_scale,
+        'xs': [x.isoformat() for x in xs],
+        'ys': [float(y) for y in ys]
+    }
+
+    new_data = deepcopy(data)
+    new_data['completed'] = 2
+    new_data['step_2'] = step2_data
+
+    return curr_state + 1, new_data
 
 
 @callback(
@@ -179,8 +218,8 @@ def stepper_next(_, data, curr_state):
     State(ID_STORE_APPDATA, 'data'),
     prevent_initial_call=True
 )
-def render_patient_arr_graph(active_step, scenario_dates, loc,
-                             x_scale: float, y_max: float, y_min: float, app_data: dict):
+def render_patient_arr_graph(active_step, scenario_dates, loc, x_scale, y_max, y_min,
+                             app_data: dict):
     """Render the patient arrivals graph when the current step is loaded,
     or when the Poisson fitting controls have changed input."""
     if active_step != 1:  # Step 2
