@@ -195,7 +195,7 @@ def render_patient_arr_graph(active_step, scenario_dates, loc,
         y_min = float(y_min)
         if x_scale <= 0:
             return no_update
-    except TypeError:
+    except BaseException:
         return no_update
 
     disease_name = app_data['step_1']['disease_name']
@@ -295,6 +295,36 @@ def validate_fit_range(fit_range, app_data):
     ]
     if len(arr_df) == 0:
         return 'No data in selected range.', True
+
+    return None, False
+
+
+@callback(
+    Output(ID_POISSON_XSCALE, 'error'),
+    Output(ID_STEPPER_BTN_2_TO_3, 'disabled'),
+    Input(ID_POISSON_PEAK, 'value'),
+    Input(ID_POISSON_XSCALE, 'value'),
+    Input(ID_POISSON_MIN, 'value'),
+    Input(ID_SCENARIO_DATES, 'value')
+)
+def validate_inputs(y_max, x_scale, y_min, sc_range):
+    """Validate scenario inputs and update error message and 'Next' button status."""
+    if y_max is None or y_max == '':
+        return None, True
+
+    if x_scale is None or x_scale == '':
+        return None, True
+    x_scale = float(x_scale)
+    if x_scale <= 0:
+        return 'Value must be positive', True
+
+    if y_min is None or y_min == '':
+        return None, True
+
+    sc_start = pd.Timestamp(sc_range[0])
+    sc_end = pd.Timestamp(sc_range[1])
+    if pd.isnull(sc_start) or pd.isnull(sc_end):
+        return None, True
 
     return None, False
 #
