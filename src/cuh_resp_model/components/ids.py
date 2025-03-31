@@ -34,3 +34,8 @@ ID_POISSON_PEAK = 'step2-numinput-arr-peak'
 ID_POISSON_XSCALE = 'step2-numinput-arr-xscale'
 ID_POISSON_MIN = 'step2-numinput-arr-min'
 ID_SCENARIO_DATES = 'step2-datepicker-scenario-dates'
+
+# Step 3 display components
+ID_GRAPH_PAEDS = {'themed_graph': True, 'name': 'step3-graph-paeds'}
+ID_GRAPH_ADULT = {'themed_graph': True, 'name': 'step3-graph-adult'}
+ID_GRAPH_SENIOR = {'themed_graph': True, 'name': 'step3-graph-senior'}
