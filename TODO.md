@@ -1,0 +1,9 @@
+- Option to analyse/model length of stay data by age group or altogether
+- Filter for dates plus chart showing peaks
+- Which distribution to fit?
+- Measure/visual assessment of goodness of fit
+- What happens if insufficient data?
+- Start by setting up App for CUH data/settings, then make more flexible...
+- Almost ready to write guide, find a place to host and test with users...
+- Aim to circulate usable version to group by end April
+- Target to "wrap up" by summer....
