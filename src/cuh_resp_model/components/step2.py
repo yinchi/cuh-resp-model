@@ -3,7 +3,6 @@
 from copy import deepcopy
 from datetime import date, timedelta
 
-import dash
 import dash_mantine_components as dmc
 import pandas as pd
 from dash import Input, Output, Patch, State, callback, dcc, no_update
@@ -150,9 +149,7 @@ def poisson_controls():
     prevent_initial_call=True
 )
 def stepper_back(_, curr_state):
-    """Go back to Step 1: Upload files.
-
-    This will clear all progress in Step 2 (deferred until user clicks Next in Step 1)."""
+    """Go back to Step 1: Upload files."""
     return curr_state - 1
 
 
@@ -185,10 +182,10 @@ def stepper_next(_, data, curr_state, scenario_dates, loc, x_scale, y_max, y_min
             return no_update, no_update
     except BaseException:
         return no_update, no_update
-    
+
     xs = [x.date() for x in pd.date_range(*scenario_dates)]
     ys = [norm_curve2(days(x, date.fromisoformat(loc)), x_scale, y_max, y_min) for x in xs]
-    
+
     step2_data = {
         'scenario_start': pd.Timestamp(scenario_dates[0]).isoformat(),
         'scenario_end': pd.Timestamp(scenario_dates[1]).isoformat(),
