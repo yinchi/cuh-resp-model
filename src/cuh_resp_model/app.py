@@ -15,7 +15,6 @@ _dash_renderer._set_react_version("18.2.0")  # pylint: disable=protected-access
 
 app = Dash(external_stylesheets=dmc.styles.ALL, use_pages=True)
 
-
 COPY = html.unescape("&copy;")
 NDASH = html.unescape("&ndash;")
 NBSP = html.unescape("&nbsp;")
