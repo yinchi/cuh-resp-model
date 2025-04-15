@@ -19,6 +19,7 @@ dependencies = [
     "openpyxl>=3.1.5",
     "pandas>=2.2.3",
     "scipy>=1.15.2",
+    "shutup>=0.2.0",
 ]
 
 [dependency-groups]
