@@ -5,7 +5,7 @@ from datetime import date, timedelta
 
 import dash_mantine_components as dmc
 import pandas as pd
-from dash import Input, Output, Patch, State, callback, dcc, no_update
+from dash import Input, Output, Patch, State, callback, clientside_callback, dcc, no_update
 from dash_compose import composition
 from dash_iconify import DashIconify
 from plotly import graph_objects as go
@@ -142,15 +142,15 @@ def poisson_controls():
 
 # region callbacks
 #
-@callback(
+
+# Go back to Step 1: Upload files when stepper button clicked.
+clientside_callback(
+    """(step, state) => state - 1""",
     Output(ID_STEPPER, "active", allow_duplicate=True),
     Input(ID_STEPPER_BTN_2_TO_1, "n_clicks"),
     State(ID_STEPPER, "active"),
     prevent_initial_call=True
 )
-def stepper_back(_, curr_state):
-    """Go back to Step 1: Upload files."""
-    return curr_state - 1
 
 
 @callback(

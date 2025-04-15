@@ -116,6 +116,7 @@ CHECK_TEXTBOX_EMPTY: JSCode = read_file(
 """Triggered when textbox is changed or Next button is pressed.
 Display error message if textbox is empty."""
 
+# Ensure a disease name is entered in the corresponding text input.
 clientside_callback(
     CHECK_TEXTBOX_EMPTY,
     Output(ID_INPUT_RESP_NAME, 'error', allow_duplicate=True),

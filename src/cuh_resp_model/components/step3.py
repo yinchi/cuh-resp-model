@@ -3,7 +3,7 @@
 import dash
 import dash_mantine_components as dmc
 import pandas as pd
-from dash import Input, Output, Patch, State, callback, dcc
+from dash import Input, Output, Patch, State, callback, clientside_callback, dcc
 from dash_compose import composition
 from plotly import graph_objects as go
 
@@ -126,15 +126,15 @@ def stepper_step():
 
 # region callbacks
 #
-@callback(
+
+# Go back to Step 2: Arrival modelling.
+clientside_callback(
+    """(step, state) => state - 1""",
     Output(ID_STEPPER, "active", allow_duplicate=True),
     Input(ID_STEPPER_BTN_3_TO_2, "n_clicks"),
     State(ID_STEPPER, "active"),
     prevent_initial_call=True
 )
-def stepper_back(_, curr_state):
-    """Go back to Step 2: Patient Arrival Modelling."""
-    return curr_state - 1
 
 
 @callback(
