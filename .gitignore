@@ -16,3 +16,6 @@ wheels/
 # Protect possibly private data
 data/
 !data/public
+
+# Python diskcache
+cache/
