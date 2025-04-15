@@ -4,10 +4,14 @@ from time import sleep
 
 import dash
 import dash_mantine_components as dmc
+import numpy as np
 import pandas as pd
 from dash import Input, Output, Patch, State, callback, clientside_callback, dcc
 from dash_compose import composition
+from fitter import Fitter
 from plotly import graph_objects as go
+from scipy import stats
+from scipy.stats import zscore
 
 from cuh_resp_model.cache import bg_manager
 from cuh_resp_model.components.ids import *
@@ -301,6 +305,8 @@ def load_los(los_data):
 
 def fit_los(los_data, group: str):
     """Fit an LoS distribution."""
+
+    # Load data and select age group
     los_df = load_los(los_data)
     if group == 'paeds':
         los = los_df.loc[los_df.Age < 16, 'LOS_Total']
@@ -310,9 +316,62 @@ def fit_los(los_data, group: str):
         los = los_df.loc[los_df.Age >= 65, 'LOS_Total']
     else:
         raise ValueError(f'Unexpected value for LoS group: {group}')
+    
+    # Remove outliers
+    los = los[np.abs(zscore(los)) < 3]
 
-    # TODO
-    sleep(5)
-    return PLACEHOLDER_TABLE_DATA
+    # Fit distributions
+    f = Fitter(los, timeout=10)
+    f.fit()
+
+    # Distribution statistics sorted by sum of squared errors
+    fit_df = f.df_errors.loc[
+        np.isfinite(f.df_errors.sumsquare_error),
+        ['sumsquare_error', 'aic', 'bic', 'ks_pvalue']
+    ].sort_values(
+        'sumsquare_error'
+    ).assign(
+        dist_mean = np.nan,
+        dist_std = np.nan
+    )
+
+    # Filter results by standard deviation
+    m = np.mean(los)
+    s = np.std(los)
+
+    for dist_name in fit_df.index:
+        dist = getattr(stats, dist_name)(*f.fitted_param[dist_name])
+        fit_df.loc[dist_name, 'dist_mean'] = dist.mean()
+        fit_df.loc[dist_name, 'dist_std'] = dist.std()
+    fit_df = fit_df.loc[
+        (fit_df.dist_mean > 0) & (fit_df.dist_std > 0.75 * s) & (fit_df.dist_std < 1.5 * s)
+    ]
+
+    # Keep top 5 only
+    fit_df = fit_df[:5].reset_index(names='Distribution')
+
+    fit_df.sumsquare_error = fit_df.sumsquare_error.round(6)
+    fit_df.aic = fit_df.aic.round(3)
+    fit_df.bic = fit_df.bic.round(3)
+    fit_df.ks_pvalue = fit_df.ks_pvalue.round(5)
+    fit_df.dist_mean = fit_df.dist_mean.round(4)
+    fit_df.dist_std = fit_df.dist_std.round(4)
+
+    # Rename columns
+    fit_df.columns = [
+        'Distribution',
+        'Σ(error²)',
+        'AIC',
+        'BIC',
+        'KS p-value',
+        'Mean',
+        'St. dev.'
+    ]
+
+    data = {
+        'head': fit_df.columns.to_list(),
+        'body': fit_df.to_numpy().tolist()
+    }
+    return data
 #
 # endregion
