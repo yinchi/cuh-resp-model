@@ -1,5 +1,7 @@
 """Module for the Daily Arrivals tab of Step 3: Patient Length-of-Stay Modelling"""
 
+from time import sleep
+
 import dash
 import dash_mantine_components as dmc
 import pandas as pd
@@ -7,6 +9,7 @@ from dash import Input, Output, Patch, State, callback, clientside_callback, dcc
 from dash_compose import composition
 from plotly import graph_objects as go
 
+from cuh_resp_model.cache import bg_manager
 from cuh_resp_model.components.ids import *
 
 from ..components.back_next import back_next
@@ -26,6 +29,11 @@ GO_OPTS = {
     'y0': 'LoS [days]',
     'orientation': 'h',
     'hoverinfo': 'skip'
+}
+
+PLACEHOLDER_TABLE_DATA = {
+    "head": ["Placeholder"],
+    "body": [[0]]
 }
 
 
@@ -50,10 +58,6 @@ def stepper_step():
         'highlightOnHover': True,
         'withTableBorder': True,
         'withColumnBorders': True
-    }
-    placeholder_table_data = {
-        "head": ["Placeholder"],
-        "body": [[0]]
     }
     select_opts = {
         'label': 'Select distribution type',
@@ -80,14 +84,22 @@ def stepper_step():
                             figure=go.Figure(layout=go_layout)
                         )
                         yield dmc.Text('Distribution fitting results', fw=700)
-                        yield dmc.Table(
-                            **table_opts,
-                            data=placeholder_table_data
-                        )
-                        yield dmc.Select(
-                            **select_opts,
-                            data=['Placeholder'],
-                        )
+                        with dmc.Stack(id='id-paeds-fit', pos="relative"):
+                            yield dmc.LoadingOverlay(
+                                id=ID_OVERLAY_PAEDS_FIT,
+                                visible=True,
+                                overlayProps={"radius": "sm", "blur": 2}
+                            )
+                            yield dmc.Table(
+                                id=ID_TABLE_PAEDS_FIT,
+                                **table_opts,
+                                data=PLACEHOLDER_TABLE_DATA
+                            )
+                            yield dmc.Select(
+                                id=ID_SELECT_PAEDS_FIT,
+                                **select_opts,
+                                data=['Placeholder'],
+                            )
                 with dmc.Card(withBorder=True):
                     yield dmc.Text('16-64 Age group', size='xl', fw=700)
                     with dmc.Stack():
@@ -96,14 +108,22 @@ def stepper_step():
                             figure=go.Figure(layout=go_layout)
                         )
                         yield dmc.Text('Distribution fitting results', fw=700)
-                        yield dmc.Table(
-                            **table_opts,
-                            data=placeholder_table_data
-                        )
-                        yield dmc.Select(
-                            **select_opts,
-                            data=['Placeholder'],
-                        )
+                        with dmc.Stack(id='id-adult-fit', pos="relative"):
+                            yield dmc.LoadingOverlay(
+                                id=ID_OVERLAY_ADULT_FIT,
+                                visible=True,
+                                overlayProps={"radius": "sm", "blur": 2}
+                            )
+                            yield dmc.Table(
+                                id=ID_TABLE_ADULT_FIT,
+                                **table_opts,
+                                data=PLACEHOLDER_TABLE_DATA
+                            )
+                            yield dmc.Select(
+                                id=ID_SELECT_ADULT_FIT,
+                                **select_opts,
+                                data=['Placeholder'],
+                            )
                 with dmc.Card(withBorder=True):
                     yield dmc.Text('65+ Age group', size='xl', fw=700)
                     with dmc.Stack():
@@ -112,14 +132,22 @@ def stepper_step():
                             figure=go.Figure(layout=go_layout)
                         )
                         yield dmc.Text('Distribution fitting results', fw=700)
-                        yield dmc.Table(
-                            **table_opts,
-                            data=placeholder_table_data
-                        )
-                        yield dmc.Select(
-                            **select_opts,
-                            data=['Placeholder'],
-                        )
+                        with dmc.Stack(id='id-senior-fit', pos="relative"):
+                            yield dmc.LoadingOverlay(
+                                id=ID_OVERLAY_SENIOR_FIT,
+                                visible=True,
+                                overlayProps={"radius": "sm", "blur": 2}
+                            )
+                            yield dmc.Table(
+                                id=ID_TABLE_SENIOR_FIT,
+                                **table_opts,
+                                data=PLACEHOLDER_TABLE_DATA
+                            )
+                            yield dmc.Select(
+                                id=ID_SELECT_SENIOR_FIT,
+                                **select_opts,
+                                data=['Placeholder'],
+                            )
                 yield back_next(ID_STEPPER_BTN_3_TO_2, ID_STEPPER_BTN_3_TO_4)
     return ret
 
@@ -166,20 +194,7 @@ def render_patient_arr_graph(active_step, app_data: dict):
         return dash.no_update
 
     los_data = app_data['step_1']['los_data']
-    los_df = pd.DataFrame.from_dict(los_data, orient='tight')
-    los_df = los_df.loc[:, ['Age', 'Admission', 'Discharge', 'ReAdmission', 'ReAdmissionDisch']]
-    los_df = los_df.assign(
-        Admission=pd.to_datetime(los_df.Admission, format='ISO8601'),
-        Discharge=pd.to_datetime(los_df.Discharge, format='ISO8601'),
-        ReAdmission=pd.to_datetime(los_df.ReAdmission, format='ISO8601'),
-        ReAdmissionDisch=pd.to_datetime(los_df.ReAdmissionDisch, format='ISO8601'),
-    )
-    los_df = los_df\
-        .assign(LOS=los_df.Discharge - los_df.Admission,
-                LOS_ReAdmission=los_df.ReAdmissionDisch - los_df.ReAdmission)\
-        .fillna({'LOS_ReAdmission': pd.Timedelta(0)})
-    los_df = los_df.assign(LOS_Total=(los_df.LOS + los_df.LOS_ReAdmission) / DAY)
-    print(los_df)
+    los_df = load_los(los_data)
 
     # See: https://dash.plotly.com/partial-properties#using-patches-on-multiple-outputs
     paeds_figure = Patch()
@@ -203,5 +218,101 @@ def render_patient_arr_graph(active_step, app_data: dict):
     )
 
     return paeds_figure, adults_figure, seniors_figure
+
+
+@callback(
+    Output(ID_TABLE_PAEDS_FIT, 'data'),
+    Output(ID_OVERLAY_PAEDS_FIT, 'visible'),
+    Input(ID_STEPPER, 'active'),
+    State(ID_STORE_APPDATA, 'data'),
+    prevent_initial_call=True,
+    background=True,
+    manager=bg_manager
+)
+def fit_los_paeds(active_step, app_data: dict):
+    """Fit LoS distributions to the paeds patient data."""
+    if active_step != 2:  # Step 3
+        return dash.no_update, True
+
+    los_data = app_data['step_1']['los_data']
+    ret = fit_los(los_data, 'paeds')
+    return ret, False
+
+
+@callback(
+    Output(ID_TABLE_ADULT_FIT, 'data'),
+    Output(ID_OVERLAY_ADULT_FIT, 'visible'),
+    Input(ID_STEPPER, 'active'),
+    State(ID_STORE_APPDATA, 'data'),
+    prevent_initial_call=True,
+    background=True,
+    manager=bg_manager
+)
+def fit_los_adult(active_step, app_data: dict):
+    """Fit LoS distributions to the adult (non-senior) patient data."""
+    if active_step != 2:  # Step 3
+        return dash.no_update, True
+
+    los_data = app_data['step_1']['los_data']
+    ret = fit_los(los_data, 'adult')
+    return ret, False
+
+
+@callback(
+    Output(ID_TABLE_SENIOR_FIT, 'data'),
+    Output(ID_OVERLAY_SENIOR_FIT, 'visible'),
+    Input(ID_STEPPER, 'active'),
+    State(ID_STORE_APPDATA, 'data'),
+    prevent_initial_call=True,
+    background=True,
+    manager=bg_manager
+)
+def fit_los_senior(active_step, app_data: dict):
+    """Fit LoS distributions to the senior patient data."""
+    if active_step != 2:  # Step 3
+        return dash.no_update, True
+
+    los_data = app_data['step_1']['los_data']
+    ret = fit_los(los_data, 'senior')
+    return ret, False
+#
+# endregion
+
+
+# region helpers
+#
+def load_los(los_data):
+    """Load LoS data from the Dash store into a pandas DataFrame."""
+    los_df = pd.DataFrame.from_dict(los_data, orient='tight')
+    los_df = los_df.loc[:, ['Age', 'Admission', 'Discharge', 'ReAdmission', 'ReAdmissionDisch']]
+    los_df = los_df.assign(
+        Admission=pd.to_datetime(los_df.Admission, format='ISO8601'),
+        Discharge=pd.to_datetime(los_df.Discharge, format='ISO8601'),
+        ReAdmission=pd.to_datetime(los_df.ReAdmission, format='ISO8601'),
+        ReAdmissionDisch=pd.to_datetime(los_df.ReAdmissionDisch, format='ISO8601'),
+    )
+    los_df = los_df\
+        .assign(LOS=los_df.Discharge - los_df.Admission,
+                LOS_ReAdmission=los_df.ReAdmissionDisch - los_df.ReAdmission)\
+        .fillna({'LOS_ReAdmission': pd.Timedelta(0)})
+    los_df = los_df.assign(LOS_Total=(los_df.LOS + los_df.LOS_ReAdmission) / DAY)
+    return los_df
+
+
+def fit_los(los_data, group: str):
+    """Fit an LoS distribution."""
+    los_df = load_los(los_data)
+    if group == 'paeds':
+        los = los_df.loc[los_df.Age < 16, 'LOS_Total']
+    elif group == 'adult':
+        los = los_df.loc[(los_df.Age >= 16) & (los_df.Age < 65), 'LOS_Total']
+    elif group == 'senior':
+        los = los_df.loc[los_df.Age >= 65, 'LOS_Total']
+    else:
+        raise ValueError(f'Unexpected value for LoS group: {group}')
+
+    # TODO
+    sleep(5)
+    return PLACEHOLDER_TABLE_DATA
 #
 # endregion

@@ -39,3 +39,15 @@ ID_SCENARIO_DATES = 'step2-datepicker-scenario-dates'
 ID_GRAPH_PAEDS = {'themed_graph': True, 'name': 'step3-graph-paeds'}
 ID_GRAPH_ADULT = {'themed_graph': True, 'name': 'step3-graph-adult'}
 ID_GRAPH_SENIOR = {'themed_graph': True, 'name': 'step3-graph-senior'}
+
+ID_OVERLAY_PAEDS_FIT = 'id-overlay-paeds-fit'
+ID_OVERLAY_ADULT_FIT = 'id-overlay-adult-fit'
+ID_OVERLAY_SENIOR_FIT = 'id-overlay-senior-fit'
+
+ID_TABLE_PAEDS_FIT = "step3-table-paeds-fit"
+ID_TABLE_ADULT_FIT = "step3-table-adult-fit"
+ID_TABLE_SENIOR_FIT = "step3-table-senior-fit"
+
+ID_SELECT_PAEDS_FIT = "step3-select-paeds-fit"
+ID_SELECT_ADULT_FIT = "step3-select-adult-fit"
+ID_SELECT_SENIOR_FIT = "step3-select-senior-fit"
