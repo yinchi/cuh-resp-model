@@ -102,6 +102,7 @@ def stepper_next(_,
     return 1, new_data
 
 
+# Disable the "Next button if any inputs are missing."
 clientside_callback(
     """(d, c1, c2) => (!d || !c1 || !c2)""",
     Output(ID_STEPPER_BTN_1_TO_2, 'disabled'),
