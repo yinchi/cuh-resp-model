@@ -1,5 +1,6 @@
 """Module for the Daily Arrivals tab of Step 3: Patient Length-of-Stay Modelling"""
 
+from copy import deepcopy
 from time import sleep
 
 import dash
@@ -175,12 +176,29 @@ clientside_callback(
     Input(ID_STEPPER_BTN_3_TO_4, "n_clicks"),
     State(ID_STORE_APPDATA, "data"),
     State(ID_STEPPER, "active"),
+    State(ID_SELECT_PAEDS_FIT, 'value'),
+    State(ID_SELECT_ADULT_FIT, 'value'),
+    State(ID_SELECT_SENIOR_FIT, 'value'),
     prevent_initial_call=True
 )
-def stepper_next(_, data, curr_state):
+def stepper_next(_, data, curr_state, dist_paeds, dist_adult, dist_senior):
     """Process app data for Step 2 and proceed to Step 3."""
 
-    return curr_state + 1, dash.no_update
+    # Error handling -- this should not trigger, so just return no_update and
+    # don't worry about showing error messages
+    if not dist_paeds or not dist_adult or not dist_senior:
+        return dash.no_update, dash.no_update
+
+    new_data = deepcopy(data)
+    new_data['completed'] = 3
+
+    new_data['step_3'] = {'dist_types': {
+        'paeds': dist_paeds,
+        'adult': dist_adult,
+        'senior': dist_senior,
+    }}
+
+    return curr_state + 1, new_data
 
 
 # Disable the "Next button if any inputs are missing."
