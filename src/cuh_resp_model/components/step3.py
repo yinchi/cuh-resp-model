@@ -183,6 +183,16 @@ def stepper_next(_, data, curr_state):
     return curr_state + 1, dash.no_update
 
 
+# Disable the "Next button if any inputs are missing."
+clientside_callback(
+    """(v1, v2, v3) => (!v1 || !v2 || !v3)""",
+    Output(ID_STEPPER_BTN_3_TO_4, 'disabled'),
+    Input(ID_SELECT_PAEDS_FIT, 'value'),
+    Input(ID_SELECT_ADULT_FIT, 'value'),
+    Input(ID_SELECT_SENIOR_FIT, 'value'),
+)
+
+
 @callback(
     Output(ID_GRAPH_PAEDS, 'figure', allow_duplicate=True),
     Output(ID_GRAPH_ADULT, 'figure', allow_duplicate=True),
@@ -226,6 +236,8 @@ def render_patient_arr_graph(active_step, app_data: dict):
 
 @callback(
     Output(ID_TABLE_PAEDS_FIT, 'data'),
+    Output(ID_SELECT_PAEDS_FIT, 'data'),
+    Output(ID_SELECT_PAEDS_FIT, 'value'),
     Output(ID_OVERLAY_PAEDS_FIT, 'visible'),
     Input(ID_STEPPER, 'active'),
     State(ID_STORE_APPDATA, 'data'),
@@ -236,15 +248,17 @@ def render_patient_arr_graph(active_step, app_data: dict):
 def fit_los_paeds(active_step, app_data: dict):
     """Fit LoS distributions to the paeds patient data."""
     if active_step != 2:  # Step 3
-        return dash.no_update, True
+        return dash.no_update, dash.no_update, dash.no_update, True
 
     los_data = app_data['step_1']['los_data']
     ret = fit_los(los_data, 'paeds')
-    return ret, False
+    return ret, [x[0] for x in ret['body']], None, False
 
 
 @callback(
     Output(ID_TABLE_ADULT_FIT, 'data'),
+    Output(ID_SELECT_ADULT_FIT, 'data'),
+    Output(ID_SELECT_ADULT_FIT, 'value'),
     Output(ID_OVERLAY_ADULT_FIT, 'visible'),
     Input(ID_STEPPER, 'active'),
     State(ID_STORE_APPDATA, 'data'),
@@ -255,15 +269,17 @@ def fit_los_paeds(active_step, app_data: dict):
 def fit_los_adult(active_step, app_data: dict):
     """Fit LoS distributions to the adult (non-senior) patient data."""
     if active_step != 2:  # Step 3
-        return dash.no_update, True
+        return dash.no_update, dash.no_update, dash.no_update, True
 
     los_data = app_data['step_1']['los_data']
     ret = fit_los(los_data, 'adult')
-    return ret, False
+    return ret, [x[0] for x in ret['body']], None, False
 
 
 @callback(
     Output(ID_TABLE_SENIOR_FIT, 'data'),
+    Output(ID_SELECT_SENIOR_FIT, 'data'),
+    Output(ID_SELECT_SENIOR_FIT, 'value'),
     Output(ID_OVERLAY_SENIOR_FIT, 'visible'),
     Input(ID_STEPPER, 'active'),
     State(ID_STORE_APPDATA, 'data'),
@@ -274,11 +290,11 @@ def fit_los_adult(active_step, app_data: dict):
 def fit_los_senior(active_step, app_data: dict):
     """Fit LoS distributions to the senior patient data."""
     if active_step != 2:  # Step 3
-        return dash.no_update, True
+        return dash.no_update, dash.no_update, dash.no_update, True
 
     los_data = app_data['step_1']['los_data']
     ret = fit_los(los_data, 'senior')
-    return ret, False
+    return ret, [x[0] for x in ret['body']], None, False
 #
 # endregion
 
