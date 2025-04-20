@@ -40,9 +40,9 @@ ID_GRAPH_PAEDS = {'themed_graph': True, 'name': 'step3-graph-paeds'}
 ID_GRAPH_ADULT = {'themed_graph': True, 'name': 'step3-graph-adult'}
 ID_GRAPH_SENIOR = {'themed_graph': True, 'name': 'step3-graph-senior'}
 
-ID_OVERLAY_PAEDS_FIT = 'id-overlay-paeds-fit'
-ID_OVERLAY_ADULT_FIT = 'id-overlay-adult-fit'
-ID_OVERLAY_SENIOR_FIT = 'id-overlay-senior-fit'
+ID_OVERLAY_PAEDS_FIT = 'step3-overlay-paeds-fit'
+ID_OVERLAY_ADULT_FIT = 'step3-overlay-adult-fit'
+ID_OVERLAY_SENIOR_FIT = 'step3-overlay-senior-fit'
 
 ID_TABLE_PAEDS_FIT = "step3-table-paeds-fit"
 ID_TABLE_ADULT_FIT = "step3-table-adult-fit"
