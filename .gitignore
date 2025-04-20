@@ -1,6 +1,6 @@
 # Package management, should probably comment out this line before publishing the app
 # to freeze the dependencies
-uv.lock
+# uv.lock
 
 # Python-generated files
 __pycache__/
