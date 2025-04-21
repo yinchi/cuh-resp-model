@@ -1,7 +1,6 @@
 """Module for the Daily Arrivals tab of Step 3: Patient Length-of-Stay Modelling"""
 
 from copy import deepcopy
-from time import sleep
 
 import dash
 import dash_mantine_components as dmc
@@ -285,8 +284,8 @@ def fit_los_paeds(active_step, app_data: dict):
         return dash.no_update, dash.no_update, dash.no_update, True, dash.no_update
 
     los_data = app_data['step_1']['los_data']
-    stats, dists = fit_los(los_data, 'paeds')
-    return stats, [x[0] for x in stats['body']], None, False, dists
+    los_stats, dists = fit_los(los_data, 'paeds')
+    return los_stats, [x[0] for x in los_stats['body']], None, False, dists
 
 
 @callback(
@@ -307,8 +306,8 @@ def fit_los_adult(active_step, app_data: dict):
         return dash.no_update, dash.no_update, dash.no_update, True, dash.no_update
 
     los_data = app_data['step_1']['los_data']
-    stats, dists = fit_los(los_data, 'adult')
-    return stats, [x[0] for x in stats['body']], None, False, dists
+    los_stats, dists = fit_los(los_data, 'adult')
+    return los_stats, [x[0] for x in los_stats['body']], None, False, dists
 
 
 @callback(
@@ -329,8 +328,8 @@ def fit_los_senior(active_step, app_data: dict):
         return dash.no_update, dash.no_update, dash.no_update, True, dash.no_update
 
     los_data = app_data['step_1']['los_data']
-    stats, dists = fit_los(los_data, 'senior')
-    return stats, [x[0] for x in stats['body']], None, False, dists
+    los_stats, dists = fit_los(los_data, 'senior')
+    return los_stats, [x[0] for x in los_stats['body']], None, False, dists
 #
 # endregion
 
@@ -375,7 +374,7 @@ def fit_los(los_data, group: str):
         los = los_df.loc[los_df.Age >= 65, 'LOS_Total']
     else:
         raise ValueError(f'Unexpected value for LoS group: {group}')
-    
+
     # Remove outliers
     los = los[np.abs(zscore(los)) < 3]
 
@@ -390,12 +389,11 @@ def fit_los(los_data, group: str):
     ].sort_values(
         'sumsquare_error'
     ).assign(
-        dist_mean = np.nan,
-        dist_std = np.nan
+        dist_mean=np.nan,
+        dist_std=np.nan
     )
 
     # Filter results by standard deviation
-    m = np.mean(los)
     s = np.std(los)
 
     for dist_name in fit_df.index:

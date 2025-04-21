@@ -26,8 +26,6 @@ def layout():
             yield step2.stepper_step()
             yield step3.stepper_step()
             yield step4.stepper_step()
-        yield dcc.Store(
-            id=ID_STORE_APPDATA
-        )
+        yield dcc.Store(id=ID_STORE_APPDATA)
     return ret
 # endregion

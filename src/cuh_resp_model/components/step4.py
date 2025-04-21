@@ -1,7 +1,8 @@
 """Module for the Daily Arrivals tab of Step 3: Patient Length-of-Stay Modelling"""
 
-from copy import deepcopy
 import json
+from copy import deepcopy
+
 import dash_mantine_components as dmc
 from dash import Input, Output, State, callback, clientside_callback, dcc
 from dash_compose import composition
@@ -50,6 +51,7 @@ clientside_callback(
     prevent_initial_call=True
 )
 
+
 @callback(
     Output(ID_CONFIG_DOWNLOAD, 'data'),
     Input(ID_CONFIG_DOWNLOAD_BTN, 'n_clicks'),
@@ -57,6 +59,7 @@ clientside_callback(
     prevent_initial_call=True
 )
 def download_config(_, data):
+    """Send the simulation config when the Download button is pressed."""
     ret = deepcopy(data)
     del ret['step_1']['los_data']  # not needed to run simulation or plot results
     return dcc.send_string(
