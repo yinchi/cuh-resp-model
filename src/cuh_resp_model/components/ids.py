@@ -51,3 +51,9 @@ ID_TABLE_SENIOR_FIT = "step3-table-senior-fit"
 ID_SELECT_PAEDS_FIT = "step3-select-paeds-fit"
 ID_SELECT_ADULT_FIT = "step3-select-adult-fit"
 ID_SELECT_SENIOR_FIT = "step3-select-senior-fit"
+
+# Step 4 Simulate!
+ID_CONFIG_DOWNLOAD_BTN = 'step4-btn-sim-config'
+ID_CONFIG_DOWNLOAD = 'step4-download-sim-config'
+ID_SIM_RESULTS = 'step4-stack-results'
+ID_OVERLAY_SIM_RESULTS = 'step4-overlay-results'

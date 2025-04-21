@@ -1,7 +1,9 @@
 """Module for the Daily Arrivals tab of Step 3: Patient Length-of-Stay Modelling"""
 
+from copy import deepcopy
+from pprint import pformat
 import dash_mantine_components as dmc
-from dash import Input, Output, State, callback
+from dash import Input, Output, State, callback, clientside_callback, dcc
 from dash_compose import composition
 
 from cuh_resp_model.components.ids import *
@@ -19,22 +21,47 @@ def stepper_step():
         with dmc.Card():
             with dmc.Stack(gap="xl"):
                 yield dmc.Text("Step 4: Simulate disease scenario", ta="center", size="xl")
+                with dmc.Stack():
+                    with dmc.Group(gap='sm'):
+                        yield dmc.Button(id=ID_CONFIG_DOWNLOAD_BTN, children="Download config")
+                        yield dcc.Download(id=ID_CONFIG_DOWNLOAD)
+                with dmc.Stack(gap='sm'):
+                    yield dmc.Text("Simulation Results", size='xl')
+                    with dmc.Stack(id=ID_SIM_RESULTS, pos="relative"):
+                        yield dmc.LoadingOverlay(
+                            id=ID_OVERLAY_SIM_RESULTS,
+                            visible=True,
+                            overlayProps={"radius": "sm", "blur": 2}
+                        )
+                        yield dmc.Stack(h=600)
                 yield back_next(ID_STEPPER_BTN_4_TO_3, None)
     return ret
 
 
 # region callbacks
 #
-@callback(
+
+# Go back to Step 3: LoS modelling.
+clientside_callback(
+    """(step, state) => state - 1""",
     Output(ID_STEPPER, "active", allow_duplicate=True),
     Input(ID_STEPPER_BTN_4_TO_3, "n_clicks"),
     State(ID_STEPPER, "active"),
     prevent_initial_call=True
 )
-def stepper_back(_, curr_state):
-    """Go back to Step 3: Patient Length-of-Stay Modelling.
 
-    This will clear all progress in Step 4 (deferred until user clicks Next in Step 3)."""
-    return curr_state - 1
+@callback(
+    Output(ID_CONFIG_DOWNLOAD, 'data'),
+    Input(ID_CONFIG_DOWNLOAD_BTN, 'n_clicks'),
+    State(ID_STORE_APPDATA, 'data'),
+    prevent_initial_call=True
+)
+def download_config(_, data):
+    ret = deepcopy(data)
+    del ret['step_1']['los_data']  # not needed to run simulation or plot results
+    return dcc.send_string(
+        pformat(ret, indent=1, width=120, compact=True, sort_dicts=False),
+        filename='config.json'
+    )
 #
 # endregion
