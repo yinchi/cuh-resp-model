@@ -81,6 +81,9 @@ def stepper_step():
         with dmc.Card():
             with dmc.Stack(gap="xl"):
                 yield dmc.Text("Step 3: Patient Length-of-Stay Modelling", ta="center", size="xl")
+                yield dcc.Store(id=ID_STORE_PAEDS_FIT)
+                yield dcc.Store(id=ID_STORE_ADULT_FIT)
+                yield dcc.Store(id=ID_STORE_SENIOR_FIT)
                 with dmc.Card(withBorder=True):
                     yield dmc.Text('0-15 Age group', size='xl', fw=700)
                     with dmc.Stack():
@@ -179,24 +182,36 @@ clientside_callback(
     State(ID_SELECT_PAEDS_FIT, 'value'),
     State(ID_SELECT_ADULT_FIT, 'value'),
     State(ID_SELECT_SENIOR_FIT, 'value'),
+    State(ID_STORE_PAEDS_FIT, 'data'),
+    State(ID_STORE_ADULT_FIT, 'data'),
+    State(ID_STORE_SENIOR_FIT, 'data'),
     prevent_initial_call=True
 )
-def stepper_next(_, data, curr_state, dist_paeds, dist_adult, dist_senior):
+def stepper_next(_, data, curr_state,
+                 seleted_dist_paeds, selected_dist_adult, selected_dist_senior,
+                 dists_paeds, dists_adult, dists_senior):
     """Process app data for Step 2 and proceed to Step 3."""
 
     # Error handling -- this should not trigger, so just return no_update and
     # don't worry about showing error messages
-    if not dist_paeds or not dist_adult or not dist_senior:
+    if not seleted_dist_paeds or not selected_dist_adult or not selected_dist_senior:
         return dash.no_update, dash.no_update
 
     new_data = deepcopy(data)
     new_data['completed'] = 3
 
-    new_data['step_3'] = {'dist_types': {
-        'paeds': dist_paeds,
-        'adult': dist_adult,
-        'senior': dist_senior,
-    }}
+    new_data['step_3'] = {
+        'selected_dists': {
+            'paeds': seleted_dist_paeds,
+            'adult': selected_dist_adult,
+            'senior': selected_dist_senior,
+        },
+        'dists': {
+            'paeds': dists_paeds,
+            'adult': dists_adult,
+            'senior': dists_senior,
+        }
+    }
 
     return curr_state + 1, new_data
 
@@ -257,6 +272,7 @@ def render_patient_arr_graph(active_step, app_data: dict):
     Output(ID_SELECT_PAEDS_FIT, 'data'),
     Output(ID_SELECT_PAEDS_FIT, 'value'),
     Output(ID_OVERLAY_PAEDS_FIT, 'visible'),
+    Output(ID_STORE_PAEDS_FIT, 'data'),
     Input(ID_STEPPER, 'active'),
     State(ID_STORE_APPDATA, 'data'),
     prevent_initial_call=True,
@@ -266,11 +282,11 @@ def render_patient_arr_graph(active_step, app_data: dict):
 def fit_los_paeds(active_step, app_data: dict):
     """Fit LoS distributions to the paeds patient data."""
     if active_step != 2:  # Step 3
-        return dash.no_update, dash.no_update, dash.no_update, True
+        return dash.no_update, dash.no_update, dash.no_update, True, dash.no_update
 
     los_data = app_data['step_1']['los_data']
-    ret = fit_los(los_data, 'paeds')
-    return ret, [x[0] for x in ret['body']], None, False
+    stats, dists = fit_los(los_data, 'paeds')
+    return stats, [x[0] for x in stats['body']], None, False, dists
 
 
 @callback(
@@ -278,6 +294,7 @@ def fit_los_paeds(active_step, app_data: dict):
     Output(ID_SELECT_ADULT_FIT, 'data'),
     Output(ID_SELECT_ADULT_FIT, 'value'),
     Output(ID_OVERLAY_ADULT_FIT, 'visible'),
+    Output(ID_STORE_ADULT_FIT, 'data'),
     Input(ID_STEPPER, 'active'),
     State(ID_STORE_APPDATA, 'data'),
     prevent_initial_call=True,
@@ -287,11 +304,11 @@ def fit_los_paeds(active_step, app_data: dict):
 def fit_los_adult(active_step, app_data: dict):
     """Fit LoS distributions to the adult (non-senior) patient data."""
     if active_step != 2:  # Step 3
-        return dash.no_update, dash.no_update, dash.no_update, True
+        return dash.no_update, dash.no_update, dash.no_update, True, dash.no_update
 
     los_data = app_data['step_1']['los_data']
-    ret = fit_los(los_data, 'adult')
-    return ret, [x[0] for x in ret['body']], None, False
+    stats, dists = fit_los(los_data, 'adult')
+    return stats, [x[0] for x in stats['body']], None, False, dists
 
 
 @callback(
@@ -299,6 +316,7 @@ def fit_los_adult(active_step, app_data: dict):
     Output(ID_SELECT_SENIOR_FIT, 'data'),
     Output(ID_SELECT_SENIOR_FIT, 'value'),
     Output(ID_OVERLAY_SENIOR_FIT, 'visible'),
+    Output(ID_STORE_SENIOR_FIT, 'data'),
     Input(ID_STEPPER, 'active'),
     State(ID_STORE_APPDATA, 'data'),
     prevent_initial_call=True,
@@ -308,11 +326,11 @@ def fit_los_adult(active_step, app_data: dict):
 def fit_los_senior(active_step, app_data: dict):
     """Fit LoS distributions to the senior patient data."""
     if active_step != 2:  # Step 3
-        return dash.no_update, dash.no_update, dash.no_update, True
+        return dash.no_update, dash.no_update, dash.no_update, True, dash.no_update
 
     los_data = app_data['step_1']['los_data']
-    ret = fit_los(los_data, 'senior')
-    return ret, [x[0] for x in ret['body']], None, False
+    stats, dists = fit_los(los_data, 'senior')
+    return stats, [x[0] for x in stats['body']], None, False, dists
 #
 # endregion
 
@@ -335,6 +353,13 @@ def load_los(los_data):
         .fillna({'LOS_ReAdmission': pd.Timedelta(0)})
     los_df = los_df.assign(LOS_Total=(los_df.LOS + los_df.LOS_ReAdmission) / DAY)
     return los_df
+
+
+def get_params(dist_name):
+    """Get the parameter names for a given distribution."""
+    # Inspired by the code for Fitter.get_best()
+    d = getattr(stats, dist_name)
+    return (d.shapes + ", loc, scale").split(", ") if d.shapes else ["loc", "scale"]
 
 
 def fit_los(los_data, group: str):
@@ -406,6 +431,10 @@ def fit_los(los_data, group: str):
         'head': fit_df.columns.to_list(),
         'body': fit_df.to_numpy().tolist()
     }
-    return data
+    dists = {
+        n: dict(zip(get_params(n), f.fitted_param[n]))
+        for n in fit_df.Distribution
+    }
+    return data, dists
 #
 # endregion

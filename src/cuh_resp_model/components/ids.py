@@ -52,6 +52,10 @@ ID_SELECT_PAEDS_FIT = "step3-select-paeds-fit"
 ID_SELECT_ADULT_FIT = "step3-select-adult-fit"
 ID_SELECT_SENIOR_FIT = "step3-select-senior-fit"
 
+ID_STORE_PAEDS_FIT = "step3-store-paeds-fit"
+ID_STORE_ADULT_FIT = "step3-store-adult-fit"
+ID_STORE_SENIOR_FIT = "step3-store-senior-fit"
+
 # Step 4 Simulate!
 ID_CONFIG_DOWNLOAD_BTN = 'step4-btn-sim-config'
 ID_CONFIG_DOWNLOAD = 'step4-download-sim-config'
