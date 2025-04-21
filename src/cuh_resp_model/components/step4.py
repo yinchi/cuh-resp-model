@@ -1,7 +1,7 @@
 """Module for the Daily Arrivals tab of Step 3: Patient Length-of-Stay Modelling"""
 
 from copy import deepcopy
-from pprint import pformat
+import json
 import dash_mantine_components as dmc
 from dash import Input, Output, State, callback, clientside_callback, dcc
 from dash_compose import composition
@@ -60,7 +60,7 @@ def download_config(_, data):
     ret = deepcopy(data)
     del ret['step_1']['los_data']  # not needed to run simulation or plot results
     return dcc.send_string(
-        pformat(ret, indent=1, width=120, compact=True, sort_dicts=False),
+        json.dumps(ret, sort_keys=False),
         filename='config.json'
     )
 #
