@@ -10,9 +10,9 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "dash-compose>=2023.3.12",
-    "dash-iconify>=0.1.2,<0.2",
-    "dash-mantine-components>=0.15.1,<0.16",
-    "dash[diskcache]>=2.18.2,<3",
+    "dash-iconify>=0.1.2",
+    "dash-mantine-components>=1.1",
+    "dash[diskcache]>=3",
     "fitter>=1.7.1",
     "humanize>=4.11.0",
     "nbformat>=5.10.4",
