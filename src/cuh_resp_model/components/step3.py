@@ -199,6 +199,13 @@ def stepper_next(_, data, curr_state,
     new_data = deepcopy(data)
     new_data['completed'] = 3
 
+    los_df = load_los(data['step_1']['los_data'])
+    age_dist = {
+        'paeds': np.mean(los_df.Age < 16),
+        'adult': np.mean((los_df.Age >= 16) & (los_df.Age < 65)),
+        'senior': np.mean(los_df.Age >= 65),
+    }
+
     new_data['step_3'] = {
         'selected_dists': {
             'paeds': seleted_dist_paeds,
@@ -209,7 +216,8 @@ def stepper_next(_, data, curr_state,
             'paeds': dists_paeds,
             'adult': dists_adult,
             'senior': dists_senior,
-        }
+        },
+        'age_dist': age_dist
     }
 
     return curr_state + 1, new_data

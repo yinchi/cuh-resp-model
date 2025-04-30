@@ -14,10 +14,12 @@ dependencies = [
     "dash-mantine-components>=1.1",
     "dash[diskcache]>=3",
     "fitter>=1.7.1",
+    "greenlet>=3.2.1",
     "humanize>=4.11.0",
     "nbformat>=5.10.4",
     "openpyxl>=3.1.5",
     "pandas>=2.2.3",
+    "salabim>=25.0.9.post0",
     "scipy>=1.15.2",
     "shutup>=0.2.0",
 ]
