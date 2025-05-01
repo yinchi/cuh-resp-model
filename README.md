@@ -18,4 +18,5 @@ Some dependencies may need to be compiled, in which case the above step may fail
 
 Then, run Step 4 again.
 
-5. `uv run python -m cuh_resp_model`
+5. Run the launcher:
+    - Linux: `chmod+x launch.sh; ./launch.sh [port number]`
