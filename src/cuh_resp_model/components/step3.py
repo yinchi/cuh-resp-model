@@ -48,7 +48,6 @@ def stepper_step():
         'width': 1000,
         'height': 300,
         'title': 'Length of stay [days]',
-        'legend': {'y': 0.5, 'font_size': 12},
         'legend_y': 0.5,
         'legend_font_size': 14,
         'title_font_size': 20,
