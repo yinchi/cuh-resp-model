@@ -9,7 +9,7 @@ from dash import Dash, _dash_renderer
 from dash_compose import composition
 from dash_iconify import DashIconify
 
-from .components.theme_toggle import theme_toggle
+from cuh_resp_model.components.theme_toggle import theme_toggle
 
 _dash_renderer._set_react_version("18.2.0")  # pylint: disable=protected-access
 
@@ -20,6 +20,7 @@ NDASH = html.unescape("&ndash;")
 NBSP = html.unescape("&nbsp;")
 
 
+# region layout
 def copyright():  # pylint: disable=redefined-builtin
     """Generate the copyright string."""
     year = date.today().year
@@ -48,8 +49,9 @@ def layout():
                     px="md",
                 ):
                     with dmc.Group():
-                        yield dmc.Image(src=dash.get_asset_url("logo-cuh.png"), h=80)
-                        yield dmc.Title("CUH respiratory viruses modelling webapp")
+                        yield dmc.Image(src=dash.get_asset_url("logo-cuh.png"), h='80px',
+                                        w='auto', fit='scale-down')
+                        yield dmc.Title("CUH respiratory viruses modelling web app")
                     with dmc.Group(gap=0, align="flex-end"):
                         # HACK: align with title text on left-side header group
                         yield dmc.Title(".", opacity=0)
@@ -90,3 +92,4 @@ def layout():
 
 
 app.layout = layout()
+# endregion

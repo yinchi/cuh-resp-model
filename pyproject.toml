@@ -12,7 +12,7 @@ dependencies = [
     "dash-compose>=2023.3.12",
     "dash-iconify>=0.1.2",
     "dash-mantine-components>=1.1",
-    "dash[diskcache]>=3",
+    "dash[diskcache]==3.0.3",
     "fitter>=1.7.1",
     "greenlet>=3.2.1",
     "humanize>=4.11.0",

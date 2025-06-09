@@ -1,26 +1,51 @@
 """Main module for Step 1 of the stepper: Upload files."""
 
+import json
 from base64 import b64decode
 from io import BytesIO
 from pathlib import Path
+from typing import Any
 
 import dash
 import dash_mantine_components as dmc
-import humanize
-import numpy as np
 import pandas as pd
-from dash import Input, Output, State, callback, clientside_callback
+from dash import Input, Output, State, callback, clientside_callback, dcc
 from dash_compose import composition
+from dash_iconify import DashIconify
 
-from cuh_resp_model.components.ids import *
+from cuh_resp_model.components.back_next import back_next
 from cuh_resp_model.utils import JSCode, read_file
 
-from .back_next import back_next
-from .upload_box import upload_box
-
-INITIAL_PROMPT = "Upload .xlsx (click or drag-and-drop)"
+MODULE_ROOT = Path(__file__).parent.parent
+DISEASE_OPTIONS = ['COVID-19', 'Influenza', 'RSV']
 
 
+TEXT_STAYS_HOVERCARD = '''\
+Please upload an .xlsx or .csv file.
+
+**Expected columns**: Refer to the example .xlsx file (green button) for minimum set of columns.
+Extra columns are ignored.
+
+**Acquisition column**: if the value in this column starts with 'Hospital', the admission time is
+replaced by the time of the first positive test (FirstPosCollected column) for the purpose of
+computing the stay length.
+'''
+
+
+TEXT_OCCUPANCY_HOVERCARD = '''\
+Please upload an .xlsx or .csv file.
+
+**Expected columns**:
+
+- Date: DD-MM-YYYY format preferred
+- Critical care: integer
+- Non critical care: integer
+
+For a minimal example, refer to the example .xlsx file (green button).
+'''
+
+
+# region layout
 @composition
 def stepper_step():
     """The contents for the Stepper Step 1 in the app."""
@@ -31,200 +56,359 @@ def stepper_step():
         description=dmc.Text(
             "Upload patient stay & occupancy records", size="xs")
     ) as ret:
+        yield dcc.Store(id='step1-store', data={})
         with dmc.Card():
             with dmc.Stack(gap="xl"):
                 yield dmc.Text("Step 1: Upload Files", ta="center", size="xl")
                 yield stack()
-                yield back_next(None, ID_STEPPER_BTN_1_TO_2)
+                yield back_next(None, 'btn-stepper-1-to-2')
     return ret
 
 
 @composition
 def stack():
     """The DMC stack."""
-    with dmc.Stack(gap=24) as ret:
-        yield dmc.TextInput(
-            label="Name of respiratory illness",
-            id=ID_INPUT_RESP_NAME,
-            placeholder="E.g., COVID, influenza, RSV"
-        )
-        yield upload_box(
-            label="Historical patient stay data:",
-            _id=ID_PATIENT_FILE_UPLOAD,
-            prompt_id=ID_PATIENT_FILE_PROMPT,
-            initial_prompt=INITIAL_PROMPT
-        )
-        yield upload_box(
-            label="Historical occupancy data:",
-            _id=ID_OCCUPANCY_FILE_UPLOAD,
-            prompt_id=ID_OCCUPANCY_FILE_PROMPT,
-            initial_prompt=INITIAL_PROMPT
-        )
+
+    with dmc.Stack(gap=36) as ret:
+        with dmc.Stack(gap=10):
+            yield dmc.Text('Name of respiratory illness:', fw=700, size='lg')
+            yield dmc.Select(
+                id='step1-select-disease-name',
+                label='Select from dropdown or select "Other" to enter a custom name:',
+                data=DISEASE_OPTIONS + ['Other'],
+                value='COVID-19',
+                w=400
+            )
+            yield dmc.TextInput(
+                id='step1-textInput-disease-name-other',
+                placeholder='Enter disease name',
+                w=400
+            )
+        with dmc.Stack(gap=10):
+            with dmc.Group(gap=5, align='baseline'):
+                yield dmc.Text('Upload patient stay data', fw=700, size='lg')
+                with dmc.HoverCard(
+                    position='top-start',
+                    withArrow=True,
+                    width=400,
+                    shadow='md',
+                ):
+                    with dmc.HoverCardTarget([]):
+                        yield DashIconify(
+                            icon='material-symbols:info-outline',
+                            width=20,
+                        )
+                    with dmc.HoverCardDropdown([], bg='#ffffaa', c='black'):
+                        yield dcc.Markdown(TEXT_STAYS_HOVERCARD)
+            with dmc.Group(align='baseline'):
+                yield dmc.Button(
+                    'Download example .xlsx file',
+                    id='step1-button-download-stays-example',
+                    color='teal'
+                )
+                yield dcc.Download(id='step1-download-stays-example')
+                with dash.dcc.Upload(
+                    id='step1-upload-stays',
+                    accept='.xlsx'
+                ):
+                    with dmc.Button([], id='step1-button-upload-stays'):
+                        yield 'Upload'
+                        yield dmc.Loader(id='step1-loader-upload-stays',
+                                         size='sm', ms='sm', color='white', display='none')
+                yield dmc.Text(
+                    'No file uploaded.',
+                    id='step1-text-upload-stays-info',
+                    c='red'
+                )
+        with dmc.Stack(gap=10):
+            with dmc.Group(gap=5, align='baseline'):
+                yield dmc.Text('Upload occupancy data', fw=700, size='lg')
+                with dmc.HoverCard(
+                    position='top-start',
+                    withArrow=True,
+                    width=400,
+                    shadow='md',
+                ):
+                    with dmc.HoverCardTarget([]):
+                        yield DashIconify(
+                            icon='material-symbols:info-outline',
+                            width=20,
+                        )
+                    with dmc.HoverCardDropdown([], bg='#ffffaa', c='black'):
+                        yield dcc.Markdown(TEXT_OCCUPANCY_HOVERCARD)
+            with dmc.Group(align='baseline'):
+                yield dmc.Button(
+                    'Download example .xlsx file',
+                    id='step1-button-download-occupancy-example',
+                    color='teal'
+                )
+                yield dcc.Download(id='step1-download-occupancy-example')
+                with dash.dcc.Upload(
+                    id='step1-upload-occupancy',
+                    accept='.xlsx'
+                ):
+                    with dmc.Button([], id='step1-button-upload-occupancy'):
+                        yield 'Upload'
+                        yield dmc.Loader(id='step1-loader-upload-occupancy',
+                                         size='sm', ms='sm', color='white', display='none')
+                yield dmc.Text(
+                    'No file uploaded.',
+                    id='step1-text-upload-occupancy-info',
+                    c='red'
+                )
     return ret
+# endregion
 
 
 # region callbacks
-#
-@callback(
-    Output(ID_STEPPER, 'active', allow_duplicate=True),
-    Output(ID_STORE_APPDATA, 'data', allow_duplicate=True),
-    Input(ID_STEPPER_BTN_1_TO_2, 'n_clicks'),
-    State(ID_INPUT_RESP_NAME, 'value'),
-    State(ID_PATIENT_FILE_UPLOAD, 'contents'),
-    State(ID_OCCUPANCY_FILE_UPLOAD, 'contents'),
-    prevent_initial_call=True
-)
-def stepper_next(_,
-                 disease_name: str,
-                 patient_file_contents: str,
-                 occupancy_file_contents: str):
-    """Process app data for Step 1 and proceed to Step 2."""
+TOGGLE_OTHER_INPUT: JSCode = \
+    read_file(Path(__file__).parent.resolve() / "js/toggle_other_input.js")
 
-    los_data, arr_data = get_los_data(to_bytesio(patient_file_contents))
-    occupancy_data = get_occupancy_data(to_bytesio(occupancy_file_contents))
-
-    # Data to save in app storage
-    new_data = {
-        "completed": 1,
-        "step_1": {
-            "disease_name": disease_name,
-            "los_data": los_data,
-            "arr_data": arr_data,
-            "occupancy_data": occupancy_data
-        }
-    }
-
-    # Validate inputs
-    if not disease_name:
-        return dash.no_update, dash.no_update
-
-    # Go to next step in Stepper (subtract 1 as 0-based) and save computed data so far
-    return 1, new_data
-
-
-# Disable the "Next button if any inputs are missing."
 clientside_callback(
-    """(d, c1, c2) => (!d || !c1 || !c2)""",
-    Output(ID_STEPPER_BTN_1_TO_2, 'disabled'),
-    Input(ID_INPUT_RESP_NAME, 'value'),
-    Input(ID_PATIENT_FILE_UPLOAD, 'contents'),
-    Input(ID_OCCUPANCY_FILE_UPLOAD, 'contents'),
-)
-
-
-CHECK_TEXTBOX_EMPTY: JSCode = read_file(
-    Path(__file__).parent.resolve() / "js/check_textbox_empty.js")
-"""Triggered when textbox is changed or Next button is pressed.
-Display error message if textbox is empty."""
-
-# Ensure a disease name is entered in the corresponding text input.
-clientside_callback(
-    CHECK_TEXTBOX_EMPTY,
-    Output(ID_INPUT_RESP_NAME, 'error', allow_duplicate=True),
-    Input(ID_INPUT_RESP_NAME, 'value'),
-    Input(ID_STEPPER_BTN_1_TO_2, "n_clicks"),
-    prevent_initial_call=True
+    TOGGLE_OTHER_INPUT,
+    Output('step1-textInput-disease-name-other', 'display'),
+    Input('step1-select-disease-name', 'value')
 )
 
 
 @callback(
-    Output(ID_PATIENT_FILE_PROMPT, 'children'),
-    Output(ID_PATIENT_FILE_PROMPT, 'c'),
-    Input(ID_PATIENT_FILE_UPLOAD, 'contents'),
-    State(ID_PATIENT_FILE_UPLOAD, 'filename'),
+    Output('step1-download-stays-example', 'data'),
+    Input('step1-button-download-stays-example', 'n_clicks'),
     prevent_initial_call=True
 )
-def show_file_details_patient(contents, filename):
-    """Show status message when a patient LOS file is uploaded."""
-    return show_file_details(contents, filename)
+def download_stays_example(_):
+    """Triggered when user clicks Download button for patient stay data example .xlsx."""
+    path = MODULE_ROOT / 'assets/stays_example.xlsx'
+    return dcc.send_file(path.resolve())
 
 
 @callback(
-    Output(ID_OCCUPANCY_FILE_PROMPT, 'children'),
-    Output(ID_OCCUPANCY_FILE_PROMPT, 'c'),
-    Input(ID_OCCUPANCY_FILE_UPLOAD, 'contents'),
-    State(ID_OCCUPANCY_FILE_UPLOAD, 'filename'),
+    Output('step1-download-occupancy-example', 'data'),
+    Input('step1-button-download-occupancy-example', 'n_clicks'),
     prevent_initial_call=True
 )
-def show_file_details_occupancy(contents, filename):
-    """Show status message when an occupancy file is uploaded."""
-    return show_file_details(contents, filename)
+def download_occupancy_example(_):
+    """Triggered when user clicks Download button for bed occupancy data example .xlsx."""
+    path = MODULE_ROOT / 'assets/occupancy_example.xlsx'
+    return dcc.send_file(path.resolve())
 
 
-def show_file_details(contents: str | None, filename: str):
-    """Show status message after file is uploaded."""
+@callback(
+    Output('step1-store', 'data', allow_duplicate=True),
+    Output('step1-text-upload-stays-info', 'children'),
+    Output('step1-text-upload-stays-info', 'c'),
+    Input('step1-upload-stays', 'contents'),
+    State('step1-upload-stays', 'filename'),
+    State('step1-store', 'data'),
+    prevent_initial_call=True,
+    running=[
+        (Output('step1-loader-upload-stays', 'display'), None, 'none'),
+        (Output('step1-button-upload-stays', 'disabled'), True, False)
+    ]
+)
+def upload_stays(contents: str, filename: str, step_data: dict[str, Any]):
+    """Triggered when user uploads file for patient stays data."""
     if contents is None:
-        return INITIAL_PROMPT, "var(--text-color)"
-    if not filename:
-        filename = "upload.xlsx"
-    _, content_string = contents.split(',')
-    decoded = b64decode(content_string)
-    filesize = humanize.naturalsize(len(decoded))
-    return (
-        f"✅ Uploaded \"{filename}\" ({filesize}). Click or drop file here to change. ✅",
-        "var(--mantine-color-green-text)"
+        info = 'No file uploaded.'
+        color = 'red'
+        los_df = None
+    elif not (filename.endswith('.xlsx') or filename.endswith('.csv')):
+        info = 'File extension must match one of: .xlsx, .csv'
+
+    # Read the patient stays dataframe
+    try:
+        los_df = extract_df(contents, filename)
+
+        # TODO validate dataframe (check columns and types)
+        assert 'Age' in los_df.columns, \
+            'Expected column "Age" not found.'
+        assert 'Admission' in los_df.columns, \
+            'Expected column "Admission" not found.'
+        assert 'Discharge' in los_df.columns, \
+            'Expected column "Discharge" not found.'
+        assert 'ReAdmission' in los_df.columns, \
+            'Expected column "ReAdmission" not found.'
+        assert 'ReAdmissionDischarge' in los_df.columns, \
+            'Expected column "ReAdmissionDischarge" not found.'
+        assert 'FirstPosCollected' in los_df.columns, \
+            'Expected column "FirstPosCollected" not found.'
+        assert 'Acquisition' in los_df.columns, \
+            'Expected column "Acquisition" not found.'
+
+        assert pd.api.types.is_numeric_dtype(los_df.Age), \
+            'Column "Age" must be of numeric type.'
+        assert pd.api.types.is_datetime64_dtype(los_df.Admission), \
+            'Column "Admission" must be of datetime type.'
+        assert pd.api.types.is_datetime64_dtype(los_df.Discharge), \
+            'Column "Discharge" must be of datetime type.'
+        assert pd.api.types.is_datetime64_dtype(los_df.ReAdmission), \
+            'Column "ReAdmission" must be of datetime type.'
+        assert pd.api.types.is_datetime64_dtype(los_df.ReAdmissionDischarge), \
+            'Column "ReAdmissionDischarge" must be of datetime type.'
+        assert pd.api.types.is_datetime64_dtype(los_df.FirstPosCollected), \
+            'Column "FirstPosCollected" must be of datetime type.'
+
+        # Ensure string type
+        los_df.Acquisition = los_df.Acquisition.astype(str)
+
+        # Drop all other columns
+        los_df = los_df[['Age', 'Admission', 'Discharge', 'ReAdmission',
+                         'ReAdmissionDischarge', 'FirstPosCollected', 'Acquisition']]
+
+        # Drop non-admitted patients
+        los_df = los_df.loc[pd.notna(los_df.Admission), :]
+
+        info = f'Successfully parsed "{filename}".'
+        color = 'green'
+    except pd.errors.EmptyDataError:
+        info, color, los_df = f'File "{filename}" is empty.', 'red', None
+    except AssertionError as e:
+        info, color, los_df = str(e), 'red', None
+    except Exception:
+        info, color, los_df = f'Could not extract table from "{filename}".', 'red', None
+
+    # Return values
+    step_data['stays_df'] = los_df.to_dict(orient='tight') if los_df is not None else None
+    return step_data, info, color
+
+
+@callback(
+    Output('step1-store', 'data', allow_duplicate=True),
+    Output('step1-text-upload-occupancy-info', 'children'),
+    Output('step1-text-upload-occupancy-info', 'c'),
+    Input('step1-upload-occupancy', 'contents'),
+    State('step1-upload-occupancy', 'filename'),
+    State('step1-store', 'data'),
+    prevent_initial_call=True,
+    running=[
+        (Output('step1-loader-upload-occupancy', 'display'), None, 'none'),
+        (Output('step1-button-upload-occupancy', 'disabled'), True, False)
+    ]
+)
+def upload_occupancy(contents: str, filename: str, step_data: dict[str, Any]):
+    """Triggered when user uploads file for occupancy data."""
+    if contents is None:
+        info = 'No file uploaded.'
+        color = 'red'
+        occupancy_df = None
+    elif not (filename.endswith('.xlsx') or filename.endswith('.csv')):
+        info = 'File extension must match one of: .xlsx, .csv'
+
+    # Read the patient occupancy dataframe
+    try:
+        occupancy_df = extract_df(contents, filename)
+
+        # Validate dataframe (check columns and types)
+        assert 'Date' in occupancy_df.columns, \
+            'Expected column not found: "Date"'
+        assert 'Critical Care' in occupancy_df.columns, \
+            'Expected column not found: "Critical Care"'
+        assert 'Non Critical Care' in occupancy_df.columns, \
+            'Expected column not found: "Non Critical Care"'
+
+        assert pd.api.types.is_datetime64_dtype(occupancy_df.Date), \
+            'Column "Date" must be of datetime type'
+        assert pd.api.types.is_integer_dtype(occupancy_df['Critical Care']), \
+            'Column "Critical Care" must be of integer type'
+        assert pd.api.types.is_integer_dtype(occupancy_df['Non Critical Care']), \
+            'Column "Non Critical Care" must be of integer type'
+
+        # Rename columns for easier handling in Python
+        occupancy_df.rename(
+            inplace=True,
+            columns={
+                'Date': 'date',
+                'Critical Care': 'critical',
+                'Non Critical Care': 'noncritical'
+            }
+        )
+
+        info = f'Successfully parsed "{filename}".'
+        color = 'green'
+    except pd.errors.EmptyDataError:
+        info, color, occupancy_df = f'File "{filename}" is empty.', 'red', None
+    except AssertionError as e:
+        info, color, occupancy_df = str(e), 'red', None
+    except Exception:
+        info, color, occupancy_df = f'Could not extract table from "{filename}".', 'red', None
+
+    # Return values
+    step_data['occupancy_df'] = (
+        occupancy_df.to_dict(orient='tight') if occupancy_df is not None else None
     )
-#
+    return step_data, info, color
+
+
+@callback(
+    Output('stepper', 'active'),
+    Output('store-appdata', 'data'),
+    Output('modal-validation-error', 'opened'),
+    Output('text-validation-error', 'children'),
+    Input('btn-stepper-1-to-2', 'n_clicks'),
+    State('step1-select-disease-name', 'value'),
+    State('step1-textInput-disease-name-other', 'value'),
+    State('step1-store', 'data'),
+    State('store-appdata', 'data'),
+    prevent_initial_call=True
+)
+def next_step(_, d_name: str, d_name_other: str,
+              step1_data: dict[str, Any], app_data: dict[str, Any]):
+    """Validate inputs for Step 1 and proceed to Step 2 if okay."""
+
+    disease_name = d_name_other if d_name == 'Other' else d_name
+    disease_name = '' if disease_name is None else str(disease_name).strip()
+    print(disease_name, step1_data.keys())
+    try:
+        assert disease_name != '', 'Disease name cannot be empty if "Other" is selected.'
+        assert 'stays_df' in step1_data, 'Patient stay data not loaded.'
+        assert 'occupancy_df' in step1_data, 'Occupancy data not loaded.'
+    except AssertionError as e:
+        return dash.no_update, dash.no_update, True, str(e)
+
+    # Update the main data store for the web app
+    old_data_json = json.dumps(app_data)
+    app_data['step1'] = {
+        'disease_name': disease_name,
+        'stays_df': step1_data['stays_df'],
+        'occupancy_df': step1_data['occupancy_df']
+    }
+    data_json = json.dumps(app_data)
+
+    # If data changed, discard all steps after the current step
+    if data_json != old_data_json:
+        app_data = {'step1': app_data['step1']}
+
+    # Proceed to the next step of the web app
+    step = 2
+
+    return step - 1, app_data, False, 'No errors detected.'
+
 # endregion
 
 
 # region helpers
-#
-def to_bytesio(file_contents: str) -> BytesIO:
-    """Convert Dash Upload bytes to an Excel file object."""
-    _, content_string = file_contents.split(',')
-    file_bytes = b64decode(content_string)
-    return BytesIO(file_bytes)
+def extract_df(dash_upload_str: str, filename: str):
+    """Extract a Pandas dataframe from a .csv or .xlsx file.
 
-
-def get_los_data(file: BytesIO) -> tuple[dict, dict]:
-    """Parse patient stay data into a Python dict (via Pandas dataframe), and
-    compute daily arrivals, defined by the time of first positive test sample.
-
-    Returns:
-        tuple[dict,dict]:
-            A pair of dicts, derived from Pandas dataframes.
-            - [0]: Processed patient length-of-stay data
-            - [1]: Daily arrival counts and 7-day rolling average.
+    Parameters:
+        dash_upload_str (str):
+            File contents in the Dash Upload format.  Contains the file type and base64-encoded
+            contents.
     """
-    los_raw = pd.read_excel(file)
-    los = los_raw.copy()
 
-    # Clean-up
+    assert filename.endswith('.csv') or filename.endswith('.xlsx'), \
+        "File extension must be .csv or .xlsx."
 
-    # Remove not admitted
-    los = los.loc[los.Summary != 'Not Admitted']
+    _, content_string = dash_upload_str.split(',')
+    decoded = b64decode(content_string)
+    file = BytesIO(decoded)
 
-    # Remove those not detected before discharge
-    los = los.loc[los.First_Pos_Collected_All < los.Discharge]
+    if filename.endswith('.csv'):
+        df = pd.read_csv(file)
+    else:
+        df = pd.read_excel(file)
+    assert df is not None, f'Could not extract table from "{filename}".'
+    assert not df.empty, f'Parsing "{filename}" resulted in an empty table.'
 
-    # Only start counting LOS from time of 1st positive test
-    los = los.assign(
-        Admission=np.maximum(los.Admission, los.First_Pos_Collected_All)
-    )
-
-    arr = pd.DataFrame(los).loc[:, ['First_Pos_Collected_All', 'Summary']]\
-        .set_index('First_Pos_Collected_All')\
-        .resample('D')\
-        .count()\
-        .rename(columns={'Summary': 'Count'})
-    arr = arr.assign(seven_d_avg=arr.rolling('7d').mean()['Count'])\
-        .rename(columns={'seven_d_avg': '7 day avg.'})
-
-    return los.to_dict('tight'), arr.to_dict('tight')
-
-
-def get_occupancy_data(file: BytesIO) -> dict:
-    """Parse occupancy data into a Python dict (via Pandas dataframe).
-
-    The table to be extracted should start in Cell A1 of the first sheet, and have columns
-    (case sensitive):
-
-    - Date
-    - Critical Care
-    - Non Critical Care
-    """
-    data = pd.read_excel(file, usecols='A:C')
-    return data.set_index('Date').to_dict('tight')
-#
+    return df
 # endregion
