@@ -357,7 +357,7 @@ def next_step(_, d_name: str, d_name_other: str,
 
     disease_name = d_name_other if d_name == 'Other' else d_name
     disease_name = '' if disease_name is None else str(disease_name).strip()
-    print(disease_name, step1_data.keys())
+
     try:
         assert disease_name != '', 'Disease name cannot be empty if "Other" is selected.'
         assert 'stays_df' in step1_data, 'Patient stay data not loaded.'
