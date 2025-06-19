@@ -366,15 +366,15 @@ def next_step(_, d_name: str, d_name_other: str,
         return dash.no_update, dash.no_update, True, str(e)
 
     # Update the main data store for the web app
-    old_data_json = json.dumps(app_data)
+    # and compare old and new data (using sort_keys=True to ensure keys are in same order.)
+    # If data changed, discard all steps after the current step
+    old_data_json = json.dumps(app_data, sort_keys=True)
     app_data['step1'] = {
         'disease_name': disease_name,
         'stays_df': step1_data['stays_df'],
         'occupancy_df': step1_data['occupancy_df']
     }
-    data_json = json.dumps(app_data)
-
-    # If data changed, discard all steps after the current step
+    data_json = json.dumps(app_data, sort_keys=True)
     if data_json != old_data_json:
         app_data = {'step1': app_data['step1']}
 
