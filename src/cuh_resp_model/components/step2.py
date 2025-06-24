@@ -427,9 +427,9 @@ def stepper_back(_, current_step: int):
     prevent_initial_call=True
 )
 def stepper_next(_, current_step: int,
-         scenario_start: str, scenario_end: str, scenario_mode: str, scenario_shape: float,
-         scenario_ymin: float, scenario_ymax: float,
-         app_data: dict[str, Any]):
+                 scenario_start: str, scenario_end: str, scenario_mode: str, scenario_shape: float,
+                 scenario_ymin: float, scenario_ymax: float,
+                 app_data: dict[str, Any]):
     """Validate inputs and go to the next step."""
 
     try:
@@ -487,7 +487,6 @@ def start_dates(stays_df: pd.DataFrame, option: Literal['Admission', 'FirstPosCo
     start_date_df = pd.DataFrame(
         {'start': start_date_series, 'num_cases': 1}
     ).set_index('start').resample('D').count()
-    
 
     # 7-day rolling average, using end date for x-value
     start_date_df['rolling_avg'] = start_date_df['num_cases'] \

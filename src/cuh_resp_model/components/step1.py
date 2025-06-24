@@ -352,7 +352,7 @@ def upload_occupancy(contents: str, filename: str, step_data: dict[str, Any]):
     prevent_initial_call=True
 )
 def stepper_next(_, d_name: str, d_name_other: str,
-              step1_data: dict[str, Any], app_data: dict[str, Any]):
+                 step1_data: dict[str, Any], app_data: dict[str, Any]):
     """Validate inputs for Step 1 and proceed to Step 2 if okay."""
 
     disease_name = d_name_other if d_name == 'Other' else d_name

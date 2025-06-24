@@ -1,3 +1,5 @@
+"""Main module for Step 3 of the stepper: Length-of-stay modelling."""
+
 import dash_mantine_components as dmc
 import fitter
 from dash import dcc
@@ -6,6 +8,7 @@ from dash_compose import composition
 from cuh_resp_model.components.back_next import back_next
 
 COMMON_DISTS = fitter.get_common_distributions()
+
 
 # region layout
 @composition
