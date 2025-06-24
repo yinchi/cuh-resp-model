@@ -405,7 +405,7 @@ def fit_arrivals(
     State('stepper', 'active'),
     prevent_initial_call=True
 )
-def stepper_next(_, current_step: int):
+def stepper_back(_, current_step: int):
     """Go back to the previous step."""
     return current_step - 1  # 1-based to 0-based numbering
 
@@ -426,7 +426,7 @@ def stepper_next(_, current_step: int):
     State('store-appdata', 'data'),
     prevent_initial_call=True
 )
-def stepper_back(_, current_step: int,
+def stepper_next(_, current_step: int,
          scenario_start: str, scenario_end: str, scenario_mode: str, scenario_shape: float,
          scenario_ymin: float, scenario_ymax: float,
          app_data: dict[str, Any]):
@@ -445,6 +445,10 @@ def stepper_back(_, current_step: int,
             x_min=scenario_start, x_max=scenario_end, x_mode=scenario_mode,
             conc=scenario_shape, y_min=scenario_ymin, y_max=scenario_ymax
         )
+        # Convert all pd.Timestamp columns in scenario_df to ISO format (str)
+        # so that Dataframe can be JSON-serialised
+        for col in scenario_df.select_dtypes('datetime').columns:
+            scenario_df[col] = scenario_df[col].astype('str')
 
         # Update the main data store for the web app
         # and compare old and new data (using sort_keys=True to ensure keys are in same order.)
@@ -452,7 +456,7 @@ def stepper_back(_, current_step: int,
         old_data_json = json.dumps(app_data, sort_keys=True)
         app_data['step2'] = {
             'scenario_parameters': sc_params,
-            'scenario_df': scenario_df
+            'scenario_df': scenario_df.to_dict(orient='tight')
         }
         data_json = json.dumps(app_data, sort_keys=True)
         if data_json != old_data_json:
@@ -483,6 +487,7 @@ def start_dates(stays_df: pd.DataFrame, option: Literal['Admission', 'FirstPosCo
     start_date_df = pd.DataFrame(
         {'start': start_date_series, 'num_cases': 1}
     ).set_index('start').resample('D').count()
+    
 
     # 7-day rolling average, using end date for x-value
     start_date_df['rolling_avg'] = start_date_df['num_cases'] \
