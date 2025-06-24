@@ -48,7 +48,7 @@ For a minimal example, refer to the example .xlsx file (green button).
 # region layout
 @composition
 def stepper_step():
-    """The contents for the Stepper Step 1 in the app."""
+    """The contents for Step 1 in the app."""
 
     with dmc.StepperStep(
         None,
@@ -67,7 +67,7 @@ def stepper_step():
 
 @composition
 def stack():
-    """The DMC stack."""
+    """The DMC stack for Step 1."""
 
     with dmc.Stack(gap=36) as ret:
         with dmc.Stack(gap=10):
@@ -340,7 +340,7 @@ def upload_occupancy(contents: str, filename: str, step_data: dict[str, Any]):
 
 
 @callback(
-    Output('stepper', 'active'),
+    Output('stepper', 'active', allow_duplicate=True),
     Output('store-appdata', 'data'),
     Output('modal-validation-error', 'opened'),
     Output('text-validation-error', 'children'),
@@ -351,7 +351,7 @@ def upload_occupancy(contents: str, filename: str, step_data: dict[str, Any]):
     State('store-appdata', 'data'),
     prevent_initial_call=True
 )
-def next_step(_, d_name: str, d_name_other: str,
+def stepper_next(_, d_name: str, d_name_other: str,
               step1_data: dict[str, Any], app_data: dict[str, Any]):
     """Validate inputs for Step 1 and proceed to Step 2 if okay."""
 
