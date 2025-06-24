@@ -61,13 +61,19 @@ The generated curves never seem to be appreciably skewed, even when selecting a 
 
 Can the distribution be overlaid on the data used to generate it
 
+- Done.
+
 Can the age distribution of admissions be displayed and manually adjusted?
 
 Combined with the next section, this would allow users to test interventions in silico... broaden use case...
 
+- Can define age groups in Step 3 for LoS fitting; however, scenarios are based on full population only
+- Can consider this in the future, e.g. for testing effect of intervention that reduces rate of incidence in specific age group only
+
 Is it possible to "save" parameters e.g. for a given illness, which could then be uploaded and adjusted?
 
- 
+- Can download full config in last step
+- **TODO**: ability to upload and run simulation on saved config without repeating manual input steps
 
 # 3 LoS Modelling
 
