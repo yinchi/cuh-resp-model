@@ -30,6 +30,7 @@ dev = [
     "ipykernel>=6.29.5",
     "isort>=5.13.2,<6",
     "matplotlib>=3.10.0",
+    "pyarrow>=20.0.0",
     "pylint>=3.3.3,<4",
 ]
 
