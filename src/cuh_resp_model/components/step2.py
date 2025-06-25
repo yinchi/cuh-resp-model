@@ -423,12 +423,14 @@ def stepper_back(_, current_step: int):
     State('step2-numinput-scenario-shape', 'value'),
     State('step2-numinput-scenario-ymin', 'value'),
     State('step2-numinput-scenario-ymax', 'value'),
+    State('step2-select-starttime-option', 'value'),  # Admission or FirstPosCollected
     State('store-appdata', 'data'),
     prevent_initial_call=True
 )
 def stepper_next(_, current_step: int,
                  scenario_start: str, scenario_end: str, scenario_mode: str, scenario_shape: float,
                  scenario_ymin: float, scenario_ymax: float,
+                 starttime_option: Literal['Admission', 'FirstPosCollected'],
                  app_data: dict[str, Any]):
     """Validate inputs and go to the next step."""
 
@@ -455,6 +457,7 @@ def stepper_next(_, current_step: int,
         # If data changed, discard all steps after the current step
         old_data_json = json.dumps(app_data, sort_keys=True)
         app_data['step2'] = {
+            'starttime_option': starttime_option,
             'scenario_parameters': sc_params,
             'scenario_df': scenario_df.to_dict(orient='tight')
         }
