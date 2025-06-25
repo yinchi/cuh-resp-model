@@ -44,9 +44,9 @@ def stack():
 
     with dmc.Stack(gap=36) as ret:
         with dmc.Stack(gap=10):
-            yield dmc.Text('Start date options:', fw=700, size='lg')
+            yield dmc.Text('Start time options:', fw=700, size='lg')
             yield dmc.Text(
-                'For community-acquired infections, use the following timestamp as the starting '
+                'For hospital-acquired infections, use the following timestamp as the starting '
                 'time:'
             )
             yield dmc.Select(
@@ -57,7 +57,7 @@ def stack():
                     {'label': 'First positive test collected (FirstPosCollected)',
                      'value': 'FirstPosCollected'}
                 ],
-                value='Admission',
+                value='FirstPosCollected',
                 w=400
             )
 
@@ -477,8 +477,8 @@ def start_dates(stays_df: pd.DataFrame, option: Literal['Admission', 'FirstPosCo
     start_date_series = stays_df.Admission.copy()
 
     if option == 'FirstPosCollected':
-        start_date_series[stays_df.Acquisition.str.startswith('Community')] = \
-            stays_df.FirstPosCollected[stays_df.Acquisition.str.startswith('Community')]
+        start_date_series[stays_df.Acquisition.str.startswith('Hospital')] = \
+            stays_df.FirstPosCollected[stays_df.Acquisition.str.startswith('Hospital')]
 
     # Original type was pd.Timestamp before to_dict, thus stored in ISO format
     # After from_dict, we need to cast back to pd.Timestamp
