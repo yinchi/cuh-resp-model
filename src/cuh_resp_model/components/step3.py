@@ -1,7 +1,9 @@
 """Main module for Step 3 of the stepper: Length-of-stay modelling."""
 
+from itertools import pairwise
+import re
 from time import sleep
-from typing import Any
+from typing import Any, Literal
 import dash_mantine_components as dmc
 import fitter
 from dash import Input, Output, State, callback, dcc
@@ -114,15 +116,26 @@ def start_mode_msg(mode: str):
     prevent_initial_call=True
 )
 @composition
-def fit_los(_, age_breakpoints: str, common_only: bool, app_data: dict[str, Any]):
+def fit_los(_, age_breakpoints: str, common_only: bool,
+            app_data: dict[str, Any]):
+    
+    starttime_option = app_data['step2']['starttime_option']
+    age_groups = get_age_groups(age_breakpoints)
 
-    age_breakpoints = '' if not age_breakpoints else age_breakpoints  # Handle None
-    age_breakpoints = age_breakpoints.split(',')
-    age_breakpoints = [int(age) for age in age_breakpoints]
+
+    print(starttime_option)
+    print(age_groups)
 
     stays_df = pd.DataFrame.from_dict(app_data['step1']['stays_df'], orient='tight')
     stays_df.to_feather('stays.feather')
+
     sleep(2)
+
+    # Adjust start dates for hospital-acquired infections based on `starttime_option`
+
+    # For each age group, generate fit parameters and Plotly graph object
+
+    # TODO: replace placeholder below
     with dmc.Stack(gap=10) as ret:
         yield dmc.Text('LoS fitting results:', size='lg', fw=700)
         yield dcc.Markdown('''\
@@ -132,4 +145,43 @@ ipsum hendrerit commodo. Nullam placerat, nulla ut faucibus molestie, ligula nis
 iaculis dui erat at felis. Pellentesque habitant morbi tristique senectus et netus et malesuada...
 ''')
     return ret
+# endregion
+
+
+# region helpers
+def get_age_groups(age_breakpoints: str):
+    """Generate age group infomation, i.e. bounds and query strings, from a comma-delimited string,
+    e.g. '16,65' generates the [0,16), [16,65), and [65, inf) age groups."""
+
+    # Validate str input
+    age_breakpoints = '' if not age_breakpoints else age_breakpoints  # Handle None
+
+    regex = r'^\d+(,\d+)*$'
+    assert re.fullmatch(regex, age_breakpoints) is not None, \
+        'Invalid input.  Expected a string of integers delimited by commas.'
+
+    # Empty string case: single age group
+    if age_breakpoints == '':
+        return [{
+            'lower': 0,
+            'upper': None,
+            'query': "Age >= 0"
+        }]
+
+    # Split str by comma and generate a dict for each age group
+    age_breakpoints = age_breakpoints.split(',')
+    age_breakpoints = [int(age) for age in age_breakpoints]
+
+    assert all(x < y for x, y in pairwise(age_breakpoints)), \
+        'Age breakpoints must be in strictly ascending order with no duplicates.'
+
+    pairs = list(pairwise([0] + age_breakpoints + [None]))
+    return [
+        {
+            'lower': pair[0],
+            'upper': pair[1],
+            'query': f"Age >= {pair[0]}{f' and Age < {pair[1]}' if pair[1] is not None else ''}"
+        }
+        for pair in pairs
+    ]
 # endregion
