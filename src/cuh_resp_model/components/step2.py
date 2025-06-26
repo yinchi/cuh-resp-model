@@ -185,7 +185,7 @@ except for the scenario start date:
 )
 def render_scenario_graph(
     active_step: int,
-    start_date_option: Literal['Admission', 'FirstPosCollected'],
+    starttime_option: Literal['Admission', 'FirstPosCollected'],
     scenario_start: pd.Timestamp,
     scenario_end: pd.Timestamp,
     scenario_mode: pd.Timestamp,
@@ -213,7 +213,7 @@ def render_scenario_graph(
 
     # Extract start dates of patients
     stays_df = pd.DataFrame.from_dict(app_data['step1']['stays_df'], orient='tight')
-    start_date_df = start_dates(stays_df, option=start_date_option)
+    start_date_df = start_dates(stays_df, option=starttime_option)
 
     # Daily arrivals
     patched_fig['data'].append(
@@ -262,9 +262,9 @@ def render_scenario_graph(
     # (i.e. user cleared the input box).  Note the conditions checked here are for input boxes in
     # invalid states; a second logic check in `beta_dist` is used for bad user input.
     try:
-        scenario_start_ts = pd.to_datetime(scenario_start)
-        scenario_end_ts = pd.to_datetime(scenario_end)
-        scenario_mode_ts = pd.to_datetime(scenario_mode)
+        scenario_start_ts = pd.to_datetime(scenario_start, format='ISO8601')
+        scenario_end_ts = pd.to_datetime(scenario_end, format='ISO8601')
+        scenario_mode_ts = pd.to_datetime(scenario_mode, format='ISO8601')
         scenario_shape = float(scenario_shape)
         scenario_ymin = float(scenario_ymin)
         scenario_ymax = float(scenario_ymax)
