@@ -23,7 +23,7 @@ Would be preferable to be able to move through this section without uploading fi
 
 - To consider in future. (**TODO**)
 
- 
+
 
 # 2 Arrival Modelling
 
@@ -81,31 +81,50 @@ Is it possible to "save" parameters e.g. for a given illness, which could then b
 
 Difficult to know which parameter to give precedence to when deciding best distribution?
 
+- Changed to only give one distribution (smallest sum squared error subject to constraints)
+
 Are mean and STDEV the best summaries for non-parametric distributions... maybe median and IQR would be better and/or more understandable for non-scientists?
+
+- Eliminated choices to simplify process; will decide later on what stats to display
 
 Would be preferable to be able to enter parameters manually as an alternative, similar to 2_Arrival modelling
 
+- TODO???
+
 Would be preferable to be able to define age ranges - or just group all patients together
+
+- Done
 
 Indicate lengths of pauses in notes e.g. may be several seconds, or may be up to 1 minute, etc.
 
+- TODO???
+
 What about critical care length of stay, likelihood of arriving on critical care, etc.?
+
+- TODO???
+- Or run a separate experiment inputting only critical care stays
 
 Needs to be robust to moving forward and back in the web app
 
- 
+- Add a check to not erase future step data unless submitted step causes data change
 
 # 4 Simulate
 
 Allow download of results as Excel or tab-delimited file
 
+- TODO
+
 When clicking "About", can't then get back to prior simulation results
+
+- Limitation of server implementation, can open in new tab instead.
 
 When attempting to move Back to 3_LoS Modelling, there is a long delay... re-calculating, rather than just going back?
 
+- Step 3 now only performs calculations on button press.
+
 How to "splice together" with actual data - to ensure the left hand side of the modelled distribution (up-slope) matches the actual numbers
 
- 
+
 
 # Typos/textual changes
 
