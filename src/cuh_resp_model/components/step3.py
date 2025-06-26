@@ -1,24 +1,23 @@
 """Main module for Step 3 of the stepper: Length-of-stay modelling."""
 
-from io import BytesIO
 import os
 import re
 from base64 import b64encode
+from io import BytesIO
 from itertools import pairwise
-from time import sleep
 from typing import Any
 
 import dash
 import dash_mantine_components as dmc
-from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
-from dash import Input, Output, Patch, State, callback, dcc, html
+import shutup
+from dash import Input, Output, Patch, State, callback, dcc
 from dash_compose import composition
+from matplotlib import pyplot as plt
 from plotly import graph_objects as go
 from scipy import stats
 from scipy.stats import zscore
-import shutup
 
 from cuh_resp_model.components.back_next import back_next
 from cuh_resp_model.components.step2 import start_dates
@@ -215,6 +214,7 @@ def render_arrivals_graph(
 
 @callback(
     Output('step3-box-results', 'children'),
+    Output('step3-store', 'data'),
     Input('step3-button-fit-los', 'n_clicks'),
     State('step3-dateinput-los-start', 'value'),
     State('step3-dateinput-los-end', 'value'),
@@ -245,9 +245,9 @@ def fit_los(_,
 
     try:
         starttime_option = app_data['step2']['starttime_option']
-        start_date = pd.to_datetime(start_date, format='ISO8601')
-        end_date = pd.to_datetime(end_date, format='ISO8601')
-        assert start_date < end_date, 'Start date must be before end date.'
+        start = pd.to_datetime(start_date, format='ISO8601')
+        end = pd.to_datetime(end_date, format='ISO8601')
+        assert start < end, 'Start date must be before end date.'
 
         age_groups = get_age_groups(age_breakpoints)
 
@@ -268,11 +268,10 @@ def fit_los(_,
                 df.loc[df.Acquisition.str.startswith('Hospital'), 'FirstPosCollected']
 
         # Filter df by date range
-        df = df.query('Start >= @start_date and Start <= @end_date')
+        df = df.query('Start >= @start and Start <= @end')
         df = df.loc[df.Discharge.notna()]
 
         # For each age group, generate fit parameters and Plotly graph object
-        results = []
         for group in age_groups:
             query = group['query']
             group_df = df.query(query)
@@ -281,39 +280,50 @@ def fit_los(_,
             assert len(group_df) >= 10, \
                 f'Fewer than 10 patients found for age group ({query}); ' \
                 f'fitting not attempted.'
-            dist_type, dist_params, fit_plot = fit_los_helper(group_df, common_only)
-            results.append({
-                'age_group': query,
+            dist_type, dist_params, fitted_plot = fit_los_helper(group_df, common_only)
+
+            # Append results to the group's dict object
+            group.update({
                 'dist_type': dist_type,
                 'dist_params': dist_params,
-                'fit_plot': fit_plot
+                'fit_plot': fitted_plot
             })
 
         # Create a DMC Stack to display the results
         with dmc.Stack(gap=5) as ret:
             yield dmc.Text('LoS fitting results:', size='lg', fw=700)
-            for result in results:
-                age_group = result['age_group'].replace('>=', '≥').replace('<=', '≤')
+            for group in age_groups:
+                age_group = group['query'].replace('>=', '≥').replace('<=', '≤')
                 yield dmc.Text(
                     f"Age group: {age_group}",
                     size='md', fw=700
                 )
                 yield dmc.Text(
-                    f"Fitted distribution: {result['dist_type']}"
+                    f"Fitted distribution: {group['dist_type']}"
                 )
-                params = {k: round(v, 4) for k, v in result['dist_params'].items()}
+                params = {k: round(v, 4) for k, v in group['dist_params'].items()}
                 yield dmc.Text(
                     f"Parameters: {params}"
                 )
                 yield img_from_bytes(
-                    result['fit_plot'],
+                    group['fit_plot'],
                     style={'max-width': '70%', 'height': 'auto'}
                 )
                 yield dmc.Space(h=10)
 
-        return ret
+        # Create the data to store in the step 3 store
+        step3_data = {
+            'start_date': start.isoformat(),
+            'end_date': end.isoformat(),
+            # Remove the 'fit_plot' key from each result to avoid storing large images
+            'results': [{k: v for k, v in group.items() if k != 'fit_plot'}
+                        for group in age_groups]
+        }
+
+        return ret, step3_data
+
     except AssertionError as e:
-        return dmc.Alert(
+        alert = dmc.Alert(
             f'Error fitting LoS distributions: {e}',
             color='red',
             title=dmc.Text(
@@ -322,6 +332,10 @@ def fit_los(_,
             ),
             id='step3-alert-fit-los-error'
         )
+
+        # Clear the Step 3 store as the fitting failed, this prevents stale data from being used
+        # in subsequent steps.
+        return alert, None
 
 
 @callback(
@@ -373,11 +387,13 @@ def get_age_groups(age_breakpoints: str):
         for pair in pairs
     ]
 
+
 def img_from_bytes(img_bytes: bytes, **kwargs):
     """Return a dash.html.Img component from a bytes object."""
     encoded = b64encode(img_bytes).decode('utf-8')
     src = f"data:image/png;base64,{encoded}"
     return dmc.Image(src=src, **kwargs)
+
 
 def fit_los_helper(df: pd.DataFrame, common_only: bool):
     """Fit LoS distributions to the given DataFrame.
@@ -387,10 +403,10 @@ def fit_los_helper(df: pd.DataFrame, common_only: bool):
     """
 
     # Compute total length of stay (LoS)
-    df = df.assign(LoS = (df.Discharge - df.Admission) / pd.Timedelta(days=1))
-    df = df.assign(ReLoS = (df.ReAdmissionDischarge - df.ReAdmission) / pd.Timedelta(days=1))
+    df = df.assign(LoS=(df.Discharge - df.Admission) / pd.Timedelta(days=1))
+    df = df.assign(ReLoS=(df.ReAdmissionDischarge - df.ReAdmission) / pd.Timedelta(days=1))
     df.ReLoS = df.ReLoS.fillna(0)
-    df = df.assign(TotalLoS = df.LoS + df.ReLoS)
+    df = df.assign(TotalLoS=df.LoS + df.ReLoS)
     los = df.TotalLoS.to_numpy()
 
     # Remove outliers
@@ -404,7 +420,7 @@ def fit_los_helper(df: pd.DataFrame, common_only: bool):
     # Since the fitter module is very verbose, we mute its warnings.
     with shutup.mute_warnings:
         f.fit(max_workers=1)
-    
+
     # Sort results by sum squared error (SSE) and compute the distibution/empirical means and
     # standard deviations
     fit_df = f.df_errors.loc[
@@ -413,10 +429,10 @@ def fit_los_helper(df: pd.DataFrame, common_only: bool):
     ].sort_values(
         'sumsquare_error'
     ).assign(
-        dist_mean = np.nan,
-        dist_std = np.nan,
-        data_mean = filtered_los.mean(),
-        data_std = filtered_los.std()
+        dist_mean=np.nan,
+        dist_std=np.nan,
+        data_mean=filtered_los.mean(),
+        data_std=filtered_los.std()
     )
 
     # Get the distribution means and standard deviations for each fitted distribution.
@@ -428,8 +444,8 @@ def fit_los_helper(df: pd.DataFrame, common_only: bool):
 
     # Get the ratios of the distribution means and stds to the empirical means and stds
     fit_df = fit_df.assign(
-        mean_ratio = fit_df.dist_mean / fit_df.data_mean,
-        std_ratio = fit_df.dist_std / fit_df.data_std,
+        mean_ratio=fit_df.dist_mean / fit_df.data_mean,
+        std_ratio=fit_df.dist_std / fit_df.data_std,
     )
 
     # Filter out distributions with NaN statistics
@@ -438,13 +454,13 @@ def fit_los_helper(df: pd.DataFrame, common_only: bool):
     # Filter out distributions where the mean or std ratio is not close to 1
     fit_df = fit_df.query('0.95 < mean_ratio < 1.05 and 0.9 < std_ratio < 1.1')\
         .sort_values(by='sumsquare_error')
-    
+
     assert not fit_df.empty, \
         'Could not get a good fit to the LoS data.'
-    
+
     # Get the best distribution type and parameters
     best_fit_type = str(fit_df.index[0])
-    
+
     # Create a new Fitter object with just the best distribution type
     f2 = fitter.Fitter(filtered_los, distributions=[best_fit_type])
     f2.fit(max_workers=1)
@@ -461,6 +477,7 @@ def fit_los_helper(df: pd.DataFrame, common_only: bool):
         png_encoded
     )
 
+
 def get_params(dist_name):
     """Get the parameters for the given distribution name.  The distribution name should be
     a string matching the name of a distribution in `scipy.stats`.
@@ -472,17 +489,18 @@ def get_params(dist_name):
     # Add 'loc' and 'scale' to the list of parameters.
     return (d.shapes + ", loc, scale").split(", ") if d.shapes else ["loc", "scale"]
 
+
 def fit_plot(f: fitter.Fitter):
     """Create a figure with the fitted and empirical distributions.  Returns a bytes object
     containing the figure image.
     """
     # Create and decorate the figure
     plt.rcParams.update({'font.size': 12})  # Set font size for matplotlib
-    plt.figure(figsize=(10,5))
+    plt.figure(figsize=(10, 5))
     f.hist()
     f.plot_pdf()
     plt.legend(fontsize='11', loc='upper right')
-    plt.title(f'Fitted distribution')
+    plt.title('Fitted distribution')
     plt.xlabel('Length of stay, days')
     plt.ylabel('Distribution density')
 
