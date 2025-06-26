@@ -386,7 +386,7 @@ def fit_arrivals(
 
         return ret, 'Success!', \
             [
-                'New fit parameters computed. To dismiss this alert, lick the X in the top right '
+                'New fit parameters computed. To dismiss this alert, click the X in the top right '
                 'corner.',
                 dmc.Space(h=10),
                 f'Peak: {ret["mode_date"].date()}, shape: {ret["shape"]}, '
