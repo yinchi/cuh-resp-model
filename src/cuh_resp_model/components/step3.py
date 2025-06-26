@@ -1,5 +1,6 @@
 """Main module for Step 3 of the stepper: Length-of-stay modelling."""
 
+import json
 import os
 import re
 from base64 import b64encode
@@ -347,6 +348,38 @@ def fit_los(_,
 def stepper_back(_, current_step: int):
     """Go back to the previous step."""
     return current_step - 1  # 1-based to 0-based numbering
+
+
+@callback(
+    Output('stepper', 'active', allow_duplicate=True),
+    Output('store-appdata', 'data', allow_duplicate=True),
+    Output('modal-validation-error', 'opened', allow_duplicate=True),
+    Output('text-validation-error', 'children', allow_duplicate=True),
+    Input('btn-stepper-3-to-4', 'n_clicks'),
+    State('stepper', 'active'),
+    State('step3-store', 'data'),
+    State('store-appdata', 'data'),
+    prevent_initial_call=True
+)
+def stepper_next(_, current_step: int, step_data: dict[str, Any], app_data: dict[str, Any]):
+    """Validate the app state and proceed to the next step."""
+
+    # Ensure that the step data is present; this should contain metadata and fitted LoS
+    # distributions for each age group.
+    if not step_data:
+        return current_step, dash.no_update, True, \
+            'No LoS fitting results found.  Please fit the LoS distributions first.'
+
+    # Update the main data store for the web app
+    # and compare old and new data (using sort_keys=True to ensure keys are in same order.)
+    # If data changed, discard all steps after the current step
+    old_data_json = json.dumps(app_data, sort_keys=True)
+    app_data['step3'] = step_data
+    data_json = json.dumps(app_data, sort_keys=True)
+    if data_json != old_data_json:
+        app_data = {f'step{n}': app_data[f'step{n}'] for n in (1, 2, 3)}
+    return current_step + 1, app_data, False, ''
+
 # endregion
 
 
