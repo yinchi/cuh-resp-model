@@ -322,6 +322,17 @@ def fit_los(_,
             ),
             id='step3-alert-fit-los-error'
         )
+
+
+@callback(
+    Output('stepper', 'active', allow_duplicate=True),
+    Input('btn-stepper-3-to-2', 'n_clicks'),
+    State('stepper', 'active'),
+    prevent_initial_call=True
+)
+def stepper_back(_, current_step: int):
+    """Go back to the previous step."""
+    return current_step - 1  # 1-based to 0-based numbering
 # endregion
 
 
