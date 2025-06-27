@@ -9,7 +9,7 @@ from dash import Dash, _dash_renderer
 from dash_compose import composition
 from dash_iconify import DashIconify
 
-from .components.theme_toggle import theme_toggle
+from cuh_resp_model.components.theme_toggle import theme_toggle
 
 _dash_renderer._set_react_version("18.2.0")  # pylint: disable=protected-access
 
@@ -20,6 +20,7 @@ NDASH = html.unescape("&ndash;")
 NBSP = html.unescape("&nbsp;")
 
 
+# region layout
 def copyright():  # pylint: disable=redefined-builtin
     """Generate the copyright string."""
     year = date.today().year
@@ -37,10 +38,11 @@ def layout():
         with dmc.AppShell(
             None,
             header={"height": "90"},
+            footer={"height": "40"},
             padding="md",
-            miw=1200
+            miw=1235
         ):
-            with dmc.AppShellHeader(None, miw=1200):
+            with dmc.AppShellHeader(None, miw=1235):
                 with dmc.Group(
                     justify="space-between",
                     style={"flex": 1},
@@ -48,8 +50,9 @@ def layout():
                     px="md",
                 ):
                     with dmc.Group():
-                        yield dmc.Image(src=dash.get_asset_url("logo-cuh.png"), h=80)
-                        yield dmc.Title("CUH respiratory viruses modelling webapp")
+                        yield dmc.Image(src=dash.get_asset_url("logo-cuh.png"), h='80px',
+                                        w='auto', fit='scale-down')
+                        yield dmc.Title("CUH respiratory viruses modelling web app")
                     with dmc.Group(gap=0, align="flex-end"):
                         # HACK: align with title text on left-side header group
                         yield dmc.Title(".", opacity=0)
@@ -60,7 +63,7 @@ def layout():
                                     yield DashIconify(
                                         icon="material-symbols:home-rounded", height=20)
                                     yield dmc.Text(f"{NBSP}{NBSP}Home", fw=700)
-                            with dmc.Anchor(None, href="/about", underline="never",
+                            with dmc.Anchor(None, href="/about", target='_blank', underline="never",
                                             style={"color": "var(--mantine-color-text)"}):
                                 with dmc.Center():
                                     yield DashIconify(
@@ -69,7 +72,7 @@ def layout():
                             yield theme_toggle()
             with dmc.AppShellMain(None, w=1200):
                 yield dash.page_container
-            with dmc.AppShellFooter(None, miw=1200):
+            with dmc.AppShellFooter(None, miw=1235):
                 with dmc.Group(
                     justify="space-between",
                     style={"flex": 1},
@@ -90,3 +93,4 @@ def layout():
 
 
 app.layout = layout()
+# endregion

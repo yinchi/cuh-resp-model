@@ -4,15 +4,15 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cuh-resp-model"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.2.0"
+description = "Respiratory virus modelling web app for CUH"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "dash-compose>=2023.3.12",
     "dash-iconify>=0.1.2",
     "dash-mantine-components>=1.1",
-    "dash[diskcache]>=3",
+    "dash[diskcache]==3.0.3",
     "fitter>=1.7.1",
     "greenlet>=3.2.1",
     "humanize>=4.11.0",
@@ -30,6 +30,7 @@ dev = [
     "ipykernel>=6.29.5",
     "isort>=5.13.2,<6",
     "matplotlib>=3.10.0",
+    "pyarrow>=20.0.0",
     "pylint>=3.3.3,<4",
 ]
 

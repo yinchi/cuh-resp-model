@@ -1,398 +1,558 @@
-"""Module for the Daily Arrivals tab of Step 2: Patient Arrival Modelling"""
+"""Main module for Step 2 of the stepper: Scenario modelling."""
 
-from copy import deepcopy
-from datetime import date, timedelta
+import json
+from typing import Any, Literal
 
+import dash
 import dash_mantine_components as dmc
+import numpy as np
 import pandas as pd
-from dash import Input, Output, Patch, State, callback, clientside_callback, dcc, no_update
+from dash import Input, Output, Patch, State, callback, dcc
 from dash_compose import composition
-from dash_iconify import DashIconify
 from plotly import graph_objects as go
 from scipy.optimize import curve_fit
-from scipy.stats import norm
+from scipy.stats import beta
 
-from cuh_resp_model.components.ids import *
+from cuh_resp_model.components.back_next import back_next
 
-from ..components.back_next import back_next
+ID_GRAPH = {'themed_graph': True, 'name': 'step2-graph-arrivals'}
 
 
+# region layout
 @composition
 def stepper_step():
-    """The contents for the Stepper Step 2 in the app."""
+    """The contents for Step 2 in the app."""
+
     with dmc.StepperStep(
         None,
-        label="Arrival Modelling",
+        label="Scenario modelling",
         description=dmc.Text(
-            "Generate patient arrival scenario", size="xs")
+            "Fit distribution for daily arrivals", size="xs")
     ) as ret:
+        yield dcc.Store(id='step2-store', data={})
         with dmc.Card():
             with dmc.Stack(gap="xl"):
-                yield dmc.Text("Step 2: Patient Arrival Modelling", ta="center", size="xl")
-                yield arr()
-                yield poisson_fitter()
-                yield poisson_controls()
-                yield back_next(ID_STEPPER_BTN_2_TO_1, ID_STEPPER_BTN_2_TO_3)
+                yield dmc.Text("Step 2: Scenario modelling", ta="center", size="xl")
+                yield stack()
+                yield back_next('btn-stepper-2-to-1', 'btn-stepper-2-to-3')
     return ret
 
 
 @composition
-def arr():
-    """Contents of the dmc.Tab."""
-    with dmc.Stack(px="sm", pt="xl", gap="xl") as ret:
-        yield dcc.Graph(
-            id=ID_GRAPH_ARR,
-            figure=go.Figure(
-                layout={
-                    'width': 1000,
-                    'height': 350,
-                    'title': '{name} cases by first positive test',
-                    'legend': {'y': 0.5, 'font_size': 12},
-                    'legend_y': 0.5,
-                    'legend_font_size': 14,
-                    'title_font_size': 20,
-                    'xaxis': {'tickfont': {'size': 14}},
-                    'yaxis': {'tickfont': {'size': 14}},
-                    'title_font_weight': 900,
-                    'hovermode': 'x unified'
-                }
-            ),
-            # config={'displayModeBar': False}
-        )
+def stack():
+    """The DMC stack for Step 2."""
+
+    with dmc.Stack(gap=36) as ret:
+        with dmc.Stack(gap=10):
+            yield dmc.Text('Start time options:', fw=700, size='lg')
+            yield dmc.Text(
+                'For hospital-acquired infections, use the following timestamp as the starting '
+                'time:'
+            )
+            yield dmc.Select(
+                id='step2-select-starttime-option',
+                data=[
+                    {'label': 'Admission',
+                     'value': 'Admission'},
+                    {'label': 'First positive test collected (FirstPosCollected)',
+                     'value': 'FirstPosCollected'}
+                ],
+                value='FirstPosCollected',
+                w=400
+            )
+
+        with dmc.Stack(gap=0):
+            yield dmc.Text('Daily patient arrivals:', fw=700, size='lg')
+            yield dcc.Graph(
+                id=ID_GRAPH,
+                figure=go.Figure(
+                    layout={
+                        'width': 1000,
+                        'height': 350,
+                        'legend': {'yanchor': 'bottom', 'y': 1,
+                                   'xanchor': 'left', 'x': 0,
+                                   'font_size': 14, 'orientation': 'h'},
+                        'title_font_size': 20,
+                        'xaxis': {'tickfont': {'size': 14}},
+                        'yaxis': {'tickfont': {'size': 14}},
+                        'title_font_weight': 900,
+                        'hovermode': 'x unified'
+                    }
+                ),
+                # config={'displayModeBar': False}
+            )
+
+        with dmc.Stack(gap=10):
+            yield dmc.Text('Scenario parameters:', fw=700, size='lg')
+            with dmc.Group(align='start'):
+                with dmc.Stack():
+                    with dmc.Group(align='start'):
+                        # Parameters for a scaled and shifted beta distribution.
+                        # Note date values are in ISO format even though the display format is
+                        # different.
+                        yield dmc.DateInput(id='step2-dateinput-scenario-start',
+                                            label='Start date (DD-MM-YYYY)',
+                                            valueFormat='DD-MM-YYYY',
+                                            value='2024-07-01',
+                                            w=200)
+                        yield dmc.DateInput(id='step2-dateinput-scenario-end',
+                                            label='End date (DD-MM-YYYY)',
+                                            valueFormat='DD-MM-YYYY',
+                                            value='2025-01-01',
+                                            w=200)
+                        yield dmc.DateInput(id='step2-dateinput-scenario-mode',
+                                            label='Peak date (DD-MM-YYYY)',
+                                            valueFormat='DD-MM-YYYY',
+                                            value='2024-09-01',
+                                            w=200)
+                    with dmc.Group(align='baseline'):
+                        yield dmc.NumberInput(id='step2-numinput-scenario-shape',
+                                              label='Shape parameter (min: 0.1)',
+                                              value=10.0, min=0.1, decimalScale=1, step=0.1,
+                                              w=200)
+                        yield dmc.NumberInput(id='step2-numinput-scenario-ymin',
+                                              label='Minimum value (min: 0)',
+                                              value=0.0, min=0, decimalScale=2,
+                                              w=200)
+                        yield dmc.NumberInput(id='step2-numinput-scenario-ymax',
+                                              label='Maximum value',
+                                              value=15.0, min=0, decimalScale=2,
+                                              w=200)
+                yield dmc.Text('⚠️ Error message goes here.',
+                               id='step2-text-params-error',
+                               display=None, mt='1.9rem', w=400, c='red')
+
+        with dmc.Stack(gap=0):
+            yield dmc.Text('Fit parameters:', fw=700, size='lg')
+            yield dcc.Markdown('''\
+Clicking the "Fit parameters" button below will replace all the parameters above
+except for the scenario start date:
+
+- The end date will be adjusted so that the fitted curve and the scenario curve have the same
+  length (in days).
+- The peak date will be set based to have the same distance from the start and end dates in both the
+  fitted and scenario curves.
+- The shape parameter and min/max values will be set to those of the fitted curve.
+''')
+            yield dmc.Alert(
+                'Errors go here.',
+                id='step2-alert-fitter',
+                color='red',
+                hide=True,
+                withCloseButton=True,
+                title=dmc.Text('Error!', size='lg'),
+                mb=10
+            )
+            with dmc.Group(align='start'):
+                # Parameters for a scaled and shifted beta distribution.
+                # Note date values are in ISO format even though the display format is
+                # different.
+                yield dmc.DateInput(id='step2-dateinput-fitter-start',
+                                    label='Start date (DD-MM-YYYY)',
+                                    valueFormat='DD-MM-YYYY',
+                                    value='2022-05-18',
+                                    w=200)
+                yield dmc.DateInput(id='step2-dateinput-fitter-end',
+                                    label='End date (DD-MM-YYYY)',
+                                    valueFormat='DD-MM-YYYY',
+                                    value='2022-09-03',
+                                    w=200)
+                yield dmc.Button('Fit parameters',
+                                 id='step2-button-fitter',
+                                 mt='1.6rem')
+                yield dcc.Store(id='step2-store-fitter-results',
+                                data=None)
     return ret
-
-
-@composition
-def poisson_fitter():
-    """dmc.Group for fitting a Poisson curve to the arrival data."""
-    with dmc.Stack() as ret:
-        yield dmc.Text('Fit Poisson curve to time period', fw=700)
-        with dmc.Group(gap='md', align='flex-end'):
-            yield dmc.DatePickerInput(
-                id=ID_POISSON_DATEPICKER,
-                label='Date Range to Fit',
-                type="range",
-                value=[date(2022, 12, 1), date(2023, 2, 1)],
-                numberOfColumns=2,
-                valueFormat="YYYY-MM-DD",
-                w=250
-            )
-            yield dmc.Button(
-                'Fit Poisson curve',
-                id=ID_POISSON_BUTTON_FIT
-            )
-            with dmc.Group(gap=0):
-                yield DashIconify(icon="material-symbols:warning-rounded", width=24,
-                                  color=dmc.DEFAULT_THEME["colors"]["yellow"][5])
-                yield dmc.Text(' Note: This will replace the horizontal scale and minimum '
-                               'value parameters below.')
-    return ret
-
-
-@composition
-def poisson_controls():
-    """dmc.Group for creating a patient arrival scenario from a Poisson curve."""
-    with dmc.Stack() as ret:
-        yield dmc.Text('Scenario parameters', size='xl', fw=700)
-        with dmc.Group(gap='md', align='flex-end'):
-            yield dmc.DatePickerInput(
-                id=ID_POISSON_PEAK_DATE,
-                label='Date of peak arrivals',
-                numberOfColumns=1,
-                valueFormat="YYYY-MM-DD",
-                value=date(2025, 1, 1),
-                w=200
-            )
-            yield dmc.NumberInput(
-                id=ID_POISSON_PEAK,
-                label='Peak daily arrivals',
-                value=20,
-                allowNegative=False,
-                hideControls=True,
-                w=200,
-            )
-            yield dmc.NumberInput(
-                id=ID_POISSON_XSCALE,
-                label='Horizontal scale parameter',
-                value=3,
-                allowNegative=False,
-                hideControls=True,
-                w=200,
-            )
-            yield dmc.NumberInput(
-                id=ID_POISSON_MIN,
-                label='Minimum value',
-                value=0,
-                allowNegative=False,
-                hideControls=True,
-                w=200,
-            )
-        with dmc.Group(gap='md', align='flex-end'):
-            yield dmc.DatePickerInput(
-                id=ID_SCENARIO_DATES,
-                label='Scenario date range',
-                type="range",
-                value=[date(2024, 10, 1), date(2025, 2, 28)],
-                numberOfColumns=2,
-                valueFormat="YYYY-MM-DD",
-                w=250
-            )
-    return ret
-
-
-# region callbacks
-#
-
-# Go back to Step 1: Upload files when stepper button clicked.
-clientside_callback(
-    """(step, state) => state - 1""",
-    Output(ID_STEPPER, "active", allow_duplicate=True),
-    Input(ID_STEPPER_BTN_2_TO_1, "n_clicks"),
-    State(ID_STEPPER, "active"),
-    prevent_initial_call=True
-)
-
-
-@callback(
-    Output(ID_STEPPER, "active", allow_duplicate=True),
-    Output(ID_STORE_APPDATA, "data", allow_duplicate=True),
-    Input(ID_STEPPER_BTN_2_TO_3, "n_clicks"),
-    State(ID_STORE_APPDATA, "data"),
-    State(ID_STEPPER, "active"),
-    State(ID_SCENARIO_DATES, 'value'),
-    State(ID_POISSON_PEAK_DATE, 'value'),
-    State(ID_POISSON_XSCALE, 'value'),
-    State(ID_POISSON_PEAK, 'value'),
-    State(ID_POISSON_MIN, 'value'),
-    prevent_initial_call=True
-)
-def stepper_next(_, data, curr_state, scenario_dates, loc, x_scale, y_max, y_min):
-    """Process app data for Step 2 and proceed to Step 3."""
-
-    # Error handling -- this should not trigger, so just return no_update and
-    # don't worry about showing error messages
-    if not scenario_dates or not loc:
-        return no_update, no_update
-
-    try:
-        x_scale = float(x_scale)
-        y_max = float(y_max)
-        y_min = float(y_min)
-        if x_scale <= 0:
-            return no_update, no_update
-    except BaseException:
-        return no_update, no_update
-
-    xs = [x.date() for x in pd.date_range(*scenario_dates)]
-    ys = [norm_curve2(days(x, date.fromisoformat(loc)), x_scale, y_max, y_min) for x in xs]
-
-    step2_data = {
-        'scenario_start': pd.Timestamp(scenario_dates[0]).isoformat(),
-        'scenario_end': pd.Timestamp(scenario_dates[1]).isoformat(),
-        'peak_date': pd.Timestamp(loc).isoformat(),
-        'peak_value': y_max,
-        'min_value': y_min,
-        'x_scale': x_scale,
-        'xs': [x.isoformat() for x in xs],
-        'ys': [float(y) for y in ys]
-    }
-
-    new_data = deepcopy(data)
-    new_data['completed'] = 2
-    new_data['step_2'] = step2_data
-
-    return curr_state + 1, new_data
-
-
-@callback(
-    Output(ID_GRAPH_ARR, 'figure', allow_duplicate=True),
-    Input(ID_STEPPER, 'active'),
-    Input(ID_SCENARIO_DATES, 'value'),
-    Input(ID_POISSON_PEAK_DATE, 'value'),
-    Input(ID_POISSON_XSCALE, 'value'),
-    Input(ID_POISSON_PEAK, 'value'),
-    Input(ID_POISSON_MIN, 'value'),
-    State(ID_STORE_APPDATA, 'data'),
-    prevent_initial_call=True
-)
-def render_patient_arr_graph(active_step, scenario_dates, loc, x_scale, y_max, y_min,
-                             app_data: dict):
-    """Render the patient arrivals graph when the current step is loaded,
-    or when the Poisson fitting controls have changed input."""
-    if active_step != 1:  # Step 2
-        return no_update
-
-    if not scenario_dates or not loc:
-        return no_update
-
-    try:
-        x_scale = float(x_scale)
-        y_max = float(y_max)
-        y_min = float(y_min)
-        if x_scale <= 0:
-            return no_update
-    except BaseException:
-        return no_update
-
-    disease_name = app_data['step_1']['disease_name']
-    arr_df = pd.DataFrame.from_dict(app_data['step_1']['arr_data'], orient='tight')
-
-    patched_fig = Patch()
-
-    patched_fig['layout']['title']['text'] = f'{disease_name} cases by first positive test'
-    patched_fig['data'] = []
-
-    patched_fig['data'].append(go.Scatter(
-        x=arr_df.index,
-        y=arr_df['Count'],
-        name='Count',
-        line={'width': 0.5}
-    ))
-    patched_fig['data'].append(go.Scatter(
-        x=arr_df.index,
-        y=arr_df['7 day avg.'],
-        name='7-day rolling avg.'
-    ))
-
-    # Scenario curve
-    # get date range from start and end dates
-    xs = [x.date() for x in pd.date_range(*scenario_dates)]
-    ys = [norm_curve2(days(x, date.fromisoformat(loc)), x_scale, y_max, y_min) for x in xs]
-    patched_fig['data'].append(go.Scatter(
-        x=xs,
-        y=ys,
-        name='Scenario'
-    ))
-
-    return patched_fig
-
-
-@callback(
-    Output(ID_POISSON_XSCALE, 'value'),
-    Output(ID_POISSON_MIN, 'value'),
-    Input(ID_POISSON_BUTTON_FIT, 'n_clicks'),
-    State(ID_POISSON_DATEPICKER, 'value'),
-    State(ID_STORE_APPDATA, 'data'),
-    prevent_initial_call=True
-)
-def fit_curve(_, fit_range, app_data):
-    """Fit a Poisson curve to the historical patient arrival data, and
-    update the horizontal scale and minimum value of the scenario."""
-
-    fit_start = pd.Timestamp(fit_range[0])
-    fit_end = pd.Timestamp(fit_range[1])
-    arr_df = pd.DataFrame.from_dict(app_data['step_1']['arr_data'], orient='tight')
-    arr_df.index = pd.to_datetime(arr_df.index)
-    arr_df = arr_df.loc[
-        (arr_df.index >= fit_start) & (arr_df.index <= fit_end)
-    ]
-    if len(arr_df) == 0:
-        return no_update, no_update
-
-    xs = (arr_df.index - arr_df.index[0]) / pd.Timedelta(days=1)
-    arr_df['xs'] = xs
-    arr_df = arr_df.reset_index(drop=False).set_index('xs', drop=True)
-
-    x_max = arr_df['7 day avg.'].idxmax()
-    y_max = arr_df['7 day avg.'].max()
-    y_min = arr_df['7 day avg.'].min()
-
-    x_scale0 = 10  # Initial guess
-
-    p_opt, _ = curve_fit(norm_curve3, arr_df.index, arr_df.Count, p0=[x_max, x_scale0, y_max])
-    p_opt, _ = curve_fit(norm_curve4, arr_df.index, arr_df.Count, p0=[*p_opt, y_min])
-
-    _, x_scale, y_max, y_min = p_opt
-
-    return round(x_scale, 3), round(y_min, 3)
-
-
-@callback(
-    Output(ID_POISSON_DATEPICKER, 'error'),
-    Output(ID_POISSON_BUTTON_FIT, 'disabled'),
-    Input(ID_POISSON_DATEPICKER, 'value'),
-    State(ID_STORE_APPDATA, 'data'),
-    prevent_initial_call=True
-)
-def validate_fit_range(fit_range, app_data):
-    """Validate the date range selection for the Poisson fitter, and update the error message
-    and button state."""
-    fit_start = pd.Timestamp(fit_range[0])
-    fit_end = pd.Timestamp(fit_range[1])
-
-    # Fields may be none if user is in the middle of changing the dates
-    if pd.isnull(fit_start) or pd.isnull(fit_end):
-        return None, True
-
-    arr_df = pd.DataFrame.from_dict(app_data['step_1']['arr_data'], orient='tight')
-    arr_df.index = pd.to_datetime(arr_df.index)
-    arr_df = arr_df.loc[
-        (arr_df.index >= fit_start) & (arr_df.index <= fit_end)
-    ]
-    if len(arr_df) == 0:
-        return 'No data in selected range.', True
-
-    return None, False
-
-
-@callback(
-    Output(ID_POISSON_XSCALE, 'error'),
-    Output(ID_STEPPER_BTN_2_TO_3, 'disabled'),
-    Input(ID_POISSON_PEAK, 'value'),
-    Input(ID_POISSON_XSCALE, 'value'),
-    Input(ID_POISSON_MIN, 'value'),
-    Input(ID_SCENARIO_DATES, 'value')
-)
-def validate_inputs(y_max, x_scale, y_min, sc_range):
-    """Validate scenario inputs and update error message and 'Next' button status."""
-    if y_max is None or y_max == '':
-        return None, True
-
-    if x_scale is None or x_scale == '':
-        return None, True
-    x_scale = float(x_scale)
-    if x_scale <= 0:
-        return 'Value must be positive', True
-
-    if y_min is None or y_min == '':
-        return None, True
-
-    sc_start = pd.Timestamp(sc_range[0])
-    sc_end = pd.Timestamp(sc_range[1])
-    if pd.isnull(sc_start) or pd.isnull(sc_end):
-        return None, True
-
-    return None, False
-#
 # endregion
 
 
-# region helper functions
-#
-def norm_curve(x, x_scale, y_max):
-    """Compute a normal curve with horizontal scale `x_scale` and maximum `y_max`."""
-    y_scale = y_max / norm.pdf(0, loc=0, scale=x_scale)
-    return norm.pdf(x, loc=0, scale=x_scale) * y_scale
+# region callbacks
+@callback(
+    Output(ID_GRAPH, 'figure', allow_duplicate=True),
+    Output('step2-text-params-error', 'children'),
+    Output('step2-text-params-error', 'display'),
+    Input('stepper', 'active'),  # current step
+    Input('step2-select-starttime-option', 'value'),  # Admission or FirstPosCollected
+    Input('step2-dateinput-scenario-start', 'value'),
+    Input('step2-dateinput-scenario-end', 'value'),
+    Input('step2-dateinput-scenario-mode', 'value'),
+    Input('step2-numinput-scenario-shape', 'value'),
+    Input('step2-numinput-scenario-ymin', 'value'),
+    Input('step2-numinput-scenario-ymax', 'value'),
+    Input('step2-store-fitter-results', 'data'),
+    State('store-appdata', 'data'),
+    prevent_initial_call=True
+)
+def render_scenario_graph(
+    active_step: int,
+    starttime_option: Literal['Admission', 'FirstPosCollected'],
+    scenario_start: pd.Timestamp,
+    scenario_end: pd.Timestamp,
+    scenario_mode: pd.Timestamp,
+    scenario_shape: float,
+    scenario_ymin: float,
+    scenario_ymax: float,
+    fitter_results: dict[str, Any] | None,
+    app_data: dict[str, Any]
+):
+    """Re-plot the daily arrivals graph.  Triggered when:
+
+    - Stepper enters Step 2
+    - Start date option (admission / first positive collected) changed
+    - Scenario controls changed
+    - A new fitter result is pushed to the Store.
+    """
+    if active_step != 1:
+        raise dash.exceptions.PreventUpdate
+
+    disease_name: str = app_data['step1']['disease_name']
+
+    patched_fig = Patch()
+    patched_fig['layout']['title']['text'] = f'{disease_name} cases by start date'
+    patched_fig['data'] = []  # reset plots
+
+    # Extract start dates of patients
+    stays_df = pd.DataFrame.from_dict(app_data['step1']['stays_df'], orient='tight')
+    start_date_df = start_dates(stays_df, option=starttime_option)
+
+    # Daily arrivals
+    patched_fig['data'].append(
+        go.Scatter(
+            x=start_date_df.index,
+            y=start_date_df.num_cases,
+            name='Count',
+            line={'width': 0.5}
+        )
+    )
+
+    # 7-day rolling average
+    patched_fig['data'].append(
+        go.Scatter(
+            x=start_date_df.index,
+            y=start_date_df.rolling_avg,
+            name='7-day rolling average',
+            # Show a short name and only 4 decimal places for the rolling average
+            hovertemplate='7-day avg.: %{y:.4f}<extra></extra>',
+            line={'width': 1}
+        )
+    )
+
+    # If we have fitter results, plot the fitted curve
+    if fitter_results is not None:
+        fit_df = beta_dist_df(
+            x_min=fitter_results['start_date'],
+            x_max=fitter_results['end_date'],
+            x_mode=fitter_results['mode_date'],
+            conc=fitter_results['shape'],
+            y_min=fitter_results['y_min'],
+            y_max=fitter_results['y_max']
+        )
+        patched_fig['data'].append(
+            go.Scatter(
+                x=fit_df.date,
+                y=fit_df.y,
+                name='Fitted curve',
+                # Show a short name and only 4 decimal places for the rolling average
+                hovertemplate='Fitted: %{y:.4f}<extra></extra>',
+                line={'width': 2}
+            )
+        )
+
+    # Skip plotting scenario curve if any input is of unexpected type, such as empty string
+    # (i.e. user cleared the input box).  Note the conditions checked here are for input boxes in
+    # invalid states; a second logic check in `beta_dist` is used for bad user input.
+    try:
+        scenario_start_ts = pd.to_datetime(scenario_start, format='ISO8601')
+        scenario_end_ts = pd.to_datetime(scenario_end, format='ISO8601')
+        scenario_mode_ts = pd.to_datetime(scenario_mode, format='ISO8601')
+        scenario_shape = float(scenario_shape)
+        scenario_ymin = float(scenario_ymin)
+        scenario_ymax = float(scenario_ymax)
+        assert (
+            pd.notna(scenario_start_ts)
+            and pd.notna(scenario_end_ts)
+            and pd.notna(scenario_mode_ts)
+            and scenario_shape > 0
+            and scenario_ymin >= 0
+            and scenario_ymax >= 0
+        )
+    except Exception as e:
+        raise dash.exceptions.PreventUpdate from e
+
+    # Create and plot scenario curve
+    try:
+        scenario_df = beta_dist_df(
+            x_min=scenario_start, x_max=scenario_end, x_mode=scenario_mode,
+            conc=scenario_shape, y_min=scenario_ymin, y_max=scenario_ymax
+        )
+        patched_fig['data'].append(
+            go.Scatter(
+                x=scenario_df.date,
+                y=scenario_df.y,
+                name='Scenario',
+                # Show a short name and only 4 decimal places for the rolling average
+                hovertemplate='Scenario: %{y:.4f}<extra></extra>',
+                line={'width': 2}
+            )
+        )
+        error_message = ''
+    except AssertionError as e:
+        patched_fig = dash.no_update  # Don't update the plots
+        error_message = f"⚠️ {str(e)}"
+
+    error_display = 'none' if error_message == '' else None
+    return patched_fig, error_message, error_display
 
 
-def norm_curve2(x, x_scale, y_max, y_min):
-    """Same as `norm_curve` but with a y-offset."""
-    return norm_curve(x, x_scale, y_max - y_min) + y_min
+@callback(
+    Output('step2-store-fitter-results', 'data'),
+    Output('step2-alert-fitter', 'title'),
+    Output('step2-alert-fitter', 'children'),
+    Output('step2-alert-fitter', 'color'),
+    Output('step2-alert-fitter', 'hide'),
+    Output('step2-dateinput-scenario-end', 'value'),
+    Output('step2-dateinput-scenario-mode', 'value'),
+    Output('step2-numinput-scenario-shape', 'value'),
+    Output('step2-numinput-scenario-ymin', 'value'),
+    Output('step2-numinput-scenario-ymax', 'value'),
+    Input('step2-button-fitter', 'n_clicks'),
+    State('step2-dateinput-fitter-start', 'value'),
+    State('step2-dateinput-fitter-end', 'value'),
+    State('step2-select-starttime-option', 'value'),  # Admission or FirstPosCollected
+    State('step2-dateinput-scenario-start', 'value'),  # Used to compute new scenario end
+    State('store-appdata', 'data'),
+    prevent_initial_call=True
+)
+def fit_arrivals(
+    _,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    start_date_option: Literal['Admission', 'FirstPosCollected'],
+    scenario_start: pd.Timestamp,
+    app_data: dict[str, Any]
+):
+    """Fit a shifted and scaled beta curve to the patient arrival data.
+    Also overwrites some of the scenario inputs to match that of the fitted curve.
+
+    Triggered on button press ("Fit parameters" button).  Shows an alert (sets hide=False)
+    with a success or error message.
+    """
+
+    # Check invalid input field states
+    try:
+        start = pd.Timestamp(start)
+        end = pd.Timestamp(end)
+        scenario_start = pd.Timestamp(scenario_start)
+        assert pd.notna(start) and pd.notna(end) and pd.notna(scenario_start)
+    except Exception as e:
+        raise dash.exceptions.PreventUpdate from e
+
+    new_scenario_end = scenario_start + (end - start)
+
+    try:
+        # Check input value logic
+        assert start < end, "Start date must be before end date."
+
+        # Extract start dates of patients
+        stays_df = pd.DataFrame.from_dict(app_data['step1']['stays_df'], orient='tight')
+        start_date_df = start_dates(stays_df, option=start_date_option)
+        start_date_df = start_date_df.loc[
+            (start_date_df.index >= start) & (start_date_df.index <= end), ['num_cases']]
+
+        assert not start_date_df.empty, "No patient stay data in selected period."
+        assert len(start_date_df) >= 5, "Too little patient stay data in selected period."
+
+        p_opt: tuple[float] = fit_beta(start_date_df)
+        x_mode, shape, y_min, y_max = p_opt
+
+        assert 0 < x_mode < 1, "Bad fit result: peak should be between the start and end dates."
+        assert shape > 0, "Bad fit result: shape should be positive."
+        assert y_max > y_min, "Bad fit result: maximum value should be larger than minimum value."
+
+        mode_days = (end - start) / pd.Timedelta(days=1) * x_mode
+        mode_timestamp = start + pd.Timedelta(days=mode_days)
+        mode_date = mode_timestamp.round('d')
+        ret = {
+            'start_date': start,
+            'end_date': end,
+            'mode': x_mode,
+            'mode_days': mode_days,
+            'mode_date': mode_date,
+            'shape': round(shape, 1),
+            'y_min': round(y_min, 2),
+            'y_max': round(y_max, 2)
+        }
+        scenario_mode_date = (scenario_start + pd.Timedelta(days=mode_days)).round('d')
+
+        return ret, 'Success!', \
+            [
+                'New fit parameters computed. To dismiss this alert, click the X in the top right '
+                'corner.',
+                dmc.Space(h=10),
+                f'Peak: {ret["mode_date"].date()}, shape: {ret["shape"]}, '
+                f'min: {ret["y_min"]}, max: {ret["y_max"]}',
+            ], 'green', False, \
+            new_scenario_end, scenario_mode_date, ret['shape'], ret['y_min'], ret['y_max']
+
+    except AssertionError as e:
+        return dash.no_update, 'Error!', str(e), 'red', False, \
+            dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
 
-def norm_curve3(x, loc, x_scale, y_max):
-    """Compute a normal curve with mean `loc`, horizontal scale `x_scale`, and maximum `y_max`."""
-    y_scale = y_max / norm.pdf(loc, loc=loc, scale=x_scale)
-    return norm.pdf(x, loc=loc, scale=x_scale) * y_scale
+@callback(
+    Output('stepper', 'active', allow_duplicate=True),
+    Input('btn-stepper-2-to-1', 'n_clicks'),
+    State('stepper', 'active'),
+    prevent_initial_call=True
+)
+def stepper_back(_, current_step: int):
+    """Go back to the previous step."""
+    return current_step - 1  # 1-based to 0-based numbering
 
 
-def norm_curve4(x, loc, x_scale, y_max, y_min):
-    """Same as `norm_curve3` but with a y-offset."""
-    return norm_curve3(x, loc, x_scale, y_max - y_min) + y_min
+@callback(
+    Output('stepper', 'active', allow_duplicate=True),
+    Output('store-appdata', 'data', allow_duplicate=True),
+    Output('modal-validation-error', 'opened', allow_duplicate=True),
+    Output('text-validation-error', 'children', allow_duplicate=True),
+    Input('btn-stepper-2-to-3', 'n_clicks'),
+    State('stepper', 'active'),
+    State('step2-dateinput-scenario-start', 'value'),
+    State('step2-dateinput-scenario-end', 'value'),
+    State('step2-dateinput-scenario-mode', 'value'),
+    State('step2-numinput-scenario-shape', 'value'),
+    State('step2-numinput-scenario-ymin', 'value'),
+    State('step2-numinput-scenario-ymax', 'value'),
+    State('step2-select-starttime-option', 'value'),  # Admission or FirstPosCollected
+    State('store-appdata', 'data'),
+    prevent_initial_call=True
+)
+def stepper_next(_, current_step: int,
+                 scenario_start: str, scenario_end: str, scenario_mode: str, scenario_shape: float,
+                 scenario_ymin: float, scenario_ymax: float,
+                 starttime_option: Literal['Admission', 'FirstPosCollected'],
+                 app_data: dict[str, Any]):
+    """Validate inputs and go to the next step."""
+
+    try:
+        sc_params = {
+            'start': scenario_start,
+            'end': scenario_end,
+            'mode': scenario_mode,
+            'shape': scenario_shape,
+            'y_min': scenario_ymin,
+            'y_max': scenario_ymax,
+        }
+        scenario_df = beta_dist_df(
+            x_min=scenario_start, x_max=scenario_end, x_mode=scenario_mode,
+            conc=scenario_shape, y_min=scenario_ymin, y_max=scenario_ymax
+        )
+        # Convert all pd.Timestamp columns in scenario_df to ISO format (str)
+        # so that Dataframe can be JSON-serialised
+        for col in scenario_df.select_dtypes('datetime').columns:
+            scenario_df[col] = scenario_df[col].astype('str')
+
+        # Update the main data store for the web app
+        # and compare old and new data (using sort_keys=True to ensure keys are in same order.)
+        # If data changed, discard all steps after the current step
+        old_data_json = json.dumps(app_data, sort_keys=True)
+        app_data['step2'] = {
+            'starttime_option': starttime_option,
+            'scenario_parameters': sc_params,
+            'scenario_df': scenario_df.to_dict(orient='tight')
+        }
+        data_json = json.dumps(app_data, sort_keys=True)
+        if data_json != old_data_json:
+            app_data = {f'step{n}': app_data[f'step{n}'] for n in (1, 2)}
+
+        return current_step + 1, app_data, False, 'No errors detected.'
+
+    except AssertionError as e:
+        return dash.no_update, dash.no_update, True, str(e)
+# endregion
 
 
-def days(x: date, loc: date) -> float:
-    """Returns the number of days from `loc`."""
-    return (x - loc) / timedelta(days=1)
-#
+# region helpers
+def start_dates(stays_df: pd.DataFrame, option: Literal['Admission', 'FirstPosCollected']):
+    """Generate a dataframe containing patient counts by start date, with a column
+    containing the 7-day rolling average."""
+
+    start_date_series = stays_df.Admission.copy()
+
+    if option == 'FirstPosCollected':
+        start_date_series[stays_df.Acquisition.str.startswith('Hospital')] = \
+            stays_df.FirstPosCollected[stays_df.Acquisition.str.startswith('Hospital')]
+
+    # Original type was pd.Timestamp before to_dict, thus stored in ISO format
+    # After from_dict, we need to cast back to pd.Timestamp
+    start_date_series = pd.to_datetime(start_date_series, format='ISO8601')
+
+    start_date_df = pd.DataFrame(
+        {'start': start_date_series, 'num_cases': 1}
+    ).set_index('start').resample('D').count()
+
+    # 7-day rolling average, using end date for x-value
+    start_date_df['rolling_avg'] = start_date_df['num_cases'] \
+        .rolling(window=7, min_periods=3, center=False).mean()
+
+    return start_date_df
+
+
+def beta_dist_df(x_min: pd.Timestamp, x_max: pd.Timestamp,
+                 x_mode: pd.Timestamp, conc: float,
+                 y_min: float, y_max: float):
+    """Scaled and shifted beta distribution, with time-based x-axis.
+
+    Parameters:
+        x_min (pandas.Timestamp): The start date of the beta curve.
+        x_max (pandas.Timestamp): The end date of the beta curve.
+        x_mode (pandas.Timestamp): The peak date of the beta curve (where y is maximum).
+        conc (pandas.Timestamp): How concentrated the curve is about its mode (maximum).
+        y_min (pandas.Timestamp): The minimum value of the beta curve.
+        y_max (pandas.Timestamp): The maximum value of the beta curve.
+
+    Raises:
+        AssertionError: If not (`x_min < x_max < x_mode` and `conc > 0` and `y_max > y_min`).
+    """
+
+    assert x_min < x_mode < x_max, "Dates must comply with start < peak < end."
+    assert conc > 0, "Shape parameter of beta distribution must be positive."
+    assert y_max > y_min, "Maximum value must be greater than minimum value."
+
+    dates = np.arange(x_min, x_max, dtype='datetime64[D]')
+    date_mapping = np.linspace(0, 1, len(dates))
+    df = pd.DataFrame({'x': date_mapping, 'date': dates})
+    mode = df.loc[df.date == x_mode, 'x'].item()
+
+    a = mode * conc + 1
+    b = (1 - mode) * conc + 1
+    dist = beta(a, b)
+    dist_max = dist.pdf(mode)
+
+    df['y'] = dist.pdf(df.x) / dist_max * (y_max - y_min) + y_min
+    return df
+
+
+def fit_beta(data: pd.DataFrame):
+    """Fits a beta curve to data.  The data should be a DataFrame with consecutive date indices
+    and an integer column `num_cases`."""
+
+    data['x'] = np.linspace(0, 1, len(data))
+
+    def my_beta(x: float, mode: float, shape: float, y_min: float, y_max: float):
+        a = mode * shape + 1
+        b = (1 - mode) * shape + 1
+        dist = beta(a, b)
+        dist_max = dist.pdf(mode)
+        y = dist.pdf(x) / dist_max * (y_max - y_min) + y_min
+        return y
+
+    p_opt, _ = curve_fit(
+        f=my_beta,
+        xdata=data['x'],
+        ydata=data['num_cases'],
+        p0=(0.5, 5, data['num_cases'].min(), data['num_cases'].max())
+    )
+    return p_opt
+
 # endregion

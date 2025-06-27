@@ -1,395 +1,464 @@
-"""Module for the Daily Arrivals tab of Step 3: Patient Length-of-Stay Modelling"""
+"""Main module for Step 3 of the stepper: Length-of-stay modelling."""
 
-from copy import deepcopy
+import json
+import os
+import re
+from base64 import b64encode
+from io import BytesIO
+from itertools import pairwise
+from typing import Any
 
 import dash
 import dash_mantine_components as dmc
 import numpy as np
 import pandas as pd
-from dash import Input, Output, Patch, State, callback, clientside_callback, dcc
+import shutup
+from dash import Input, Output, Patch, State, callback, dcc
 from dash_compose import composition
-from fitter import Fitter
+from matplotlib import pyplot as plt
 from plotly import graph_objects as go
 from scipy import stats
 from scipy.stats import zscore
 
-from cuh_resp_model.cache import bg_manager
-from cuh_resp_model.components.ids import *
+from cuh_resp_model.components.back_next import back_next
+from cuh_resp_model.components.step2 import start_dates
 
-from ..components.back_next import back_next
-
-DAY = pd.Timedelta(days=1)
-
-GO_OPTS = {
-    'spanmode': 'hard',
-    'box_visible': True,
-    'box_fillcolor': '#aa55aa',
-    'box_line_color': '#aa00aa',
-    'points': 'all',
-    'meanline_visible': True,
-    'meanline_color': 'red',
-    'marker_size': 2,
-    'marker_opacity': 0.5,
-    'y0': 'LoS [days]',
-    'orientation': 'h',
-    'hoverinfo': 'skip'
-}
-
-PLACEHOLDER_TABLE_DATA = {
-    "head": ["Placeholder"],
-    "body": [[0]]
-}
+# fmt: off
+# isort: off
+os.environ['LOGURU_AUTOINIT'] = '0'
+import fitter  # pylint: disable=C0411,C0413
+COMMON_DISTS = fitter.get_common_distributions()
+# isort: on
+# fmt: on
 
 
+ID_GRAPH = {'themed_graph': True, 'name': 'step3-graph-arrivals'}
+
+
+# region layout
 @composition
 def stepper_step():
-    """The contents for the Stepper Step 3 in the app."""
-    go_layout = {
-        'width': 1000,
-        'height': 300,
-        'title': 'Length of stay [days]',
-        'legend_y': 0.5,
-        'legend_font_size': 14,
-        'title_font_size': 20,
-        'xaxis': {'tickfont': {'size': 14}},
-        'yaxis': {'tickfont': {'size': 14}},
-        'title_font_weight': 900,
-        'hovermode': 'x unified'
-    }
-    table_opts = {
-        'striped': True,
-        'highlightOnHover': True,
-        'withTableBorder': True,
-        'withColumnBorders': True
-    }
-    select_opts = {
-        'label': 'Select distribution type',
-        'description': 'The chosen distribution will be used for the final '
-        'simulation step',
-        'placeholder': 'Choose distribution type',
-        'allowDeselect': False,
-        'w': 400
-    }
+    """The contents for Step 3 in the app."""
+
     with dmc.StepperStep(
         None,
-        label="LoS Modelling",
+        label="LoS modelling",
         description=dmc.Text(
-            "Fit patient length-of-stay distributions", size="xs")
+            "Fit distribution for patient LoS", size="xs")
     ) as ret:
+        yield dcc.Store(id='step3-store', data={})
         with dmc.Card():
             with dmc.Stack(gap="xl"):
-                yield dmc.Text("Step 3: Patient Length-of-Stay Modelling", ta="center", size="xl")
-                yield dcc.Store(id=ID_STORE_PAEDS_FIT)
-                yield dcc.Store(id=ID_STORE_ADULT_FIT)
-                yield dcc.Store(id=ID_STORE_SENIOR_FIT)
-                with dmc.Card(withBorder=True):
-                    yield dmc.Text('0-15 Age group', size='xl', fw=700)
-                    with dmc.Stack():
-                        yield dcc.Graph(
-                            id=ID_GRAPH_PAEDS,
-                            figure=go.Figure(layout=go_layout)
-                        )
-                        yield dmc.Text('Distribution fitting results', fw=700)
-                        with dmc.Stack(id='id-paeds-fit', pos="relative"):
-                            yield dmc.LoadingOverlay(
-                                id=ID_OVERLAY_PAEDS_FIT,
-                                visible=True,
-                                overlayProps={"radius": "sm", "blur": 2}
-                            )
-                            yield dmc.Table(
-                                id=ID_TABLE_PAEDS_FIT,
-                                **table_opts,
-                                data=PLACEHOLDER_TABLE_DATA
-                            )
-                            yield dmc.Select(
-                                id=ID_SELECT_PAEDS_FIT,
-                                **select_opts,
-                                data=['Placeholder'],
-                            )
-                with dmc.Card(withBorder=True):
-                    yield dmc.Text('16-64 Age group', size='xl', fw=700)
-                    with dmc.Stack():
-                        yield dcc.Graph(
-                            id=ID_GRAPH_ADULT,
-                            figure=go.Figure(layout=go_layout)
-                        )
-                        yield dmc.Text('Distribution fitting results', fw=700)
-                        with dmc.Stack(id='id-adult-fit', pos="relative"):
-                            yield dmc.LoadingOverlay(
-                                id=ID_OVERLAY_ADULT_FIT,
-                                visible=True,
-                                overlayProps={"radius": "sm", "blur": 2}
-                            )
-                            yield dmc.Table(
-                                id=ID_TABLE_ADULT_FIT,
-                                **table_opts,
-                                data=PLACEHOLDER_TABLE_DATA
-                            )
-                            yield dmc.Select(
-                                id=ID_SELECT_ADULT_FIT,
-                                **select_opts,
-                                data=['Placeholder'],
-                            )
-                with dmc.Card(withBorder=True):
-                    yield dmc.Text('65+ Age group', size='xl', fw=700)
-                    with dmc.Stack():
-                        yield dcc.Graph(
-                            id=ID_GRAPH_SENIOR,
-                            figure=go.Figure(layout=go_layout)
-                        )
-                        yield dmc.Text('Distribution fitting results', fw=700)
-                        with dmc.Stack(id='id-senior-fit', pos="relative"):
-                            yield dmc.LoadingOverlay(
-                                id=ID_OVERLAY_SENIOR_FIT,
-                                visible=True,
-                                overlayProps={"radius": "sm", "blur": 2}
-                            )
-                            yield dmc.Table(
-                                id=ID_TABLE_SENIOR_FIT,
-                                **table_opts,
-                                data=PLACEHOLDER_TABLE_DATA
-                            )
-                            yield dmc.Select(
-                                id=ID_SELECT_SENIOR_FIT,
-                                **select_opts,
-                                data=['Placeholder'],
-                            )
-                yield back_next(ID_STEPPER_BTN_3_TO_2, ID_STEPPER_BTN_3_TO_4)
+                yield dmc.Text("Step 3: Length-of-stay modelling", ta="center", size="xl")
+                yield stack()
+                yield back_next('btn-stepper-3-to-2', 'btn-stepper-3-to-4')
     return ret
 
 
+@composition
+def stack():
+    """The DMC stack for Step 3."""
+
+    with dmc.Stack(gap=36) as ret:
+        with dmc.Stack(gap=10):
+            yield dmc.Text('Start date option:', fw=700, size='lg')
+            yield dmc.Text('', id='step3-text-starttime-mode', size='sm')
+        with dmc.Stack(gap=10):
+            yield dmc.Text('Define age groups:', fw=700, size='lg')
+            yield dcc.Markdown('''\
+Enter a list of age breakpoints, separated by commas.  For example, `16,65` creates three
+age groups, 0-15, 16-64, and 65+.  Leaving the input below blank creates a single age group
+for all patients.''', style={'font-size': 'small'})
+            yield dmc.TextInput(
+                id='step3-textinput-age-groups',
+                label='Age group breakpoints',
+                value="16,65",
+                w=200
+            )
+        with dmc.Stack(gap=10):
+            yield dmc.Text('Select date range for LoS fitting:', fw=700, size='lg')
+            with dmc.Group(align='start'):
+                yield dmc.DateInput(id='step3-dateinput-los-start',
+                                    label='Start date (DD-MM-YYYY)',
+                                    valueFormat='DD-MM-YYYY',
+                                    value='2022-05-18',
+                                    w=200)
+                yield dmc.DateInput(id='step3-dateinput-los-end',
+                                    label='End date (DD-MM-YYYY)',
+                                    valueFormat='DD-MM-YYYY',
+                                    value='2022-09-03',
+                                    w=200)
+            yield dcc.Graph(
+                id=ID_GRAPH,
+                figure=go.Figure(
+                    layout={
+                        'width': 1000,
+                        'height': 350,
+                        'legend': {'yanchor': 'bottom', 'y': 1,
+                                   'xanchor': 'left', 'x': 0,
+                                   'font_size': 14, 'orientation': 'h'},
+                        'title_font_size': 20,
+                        'xaxis': {'tickfont': {'size': 14}},
+                        'yaxis': {'tickfont': {'size': 14}},
+                        'title_font_weight': 900,
+                        'hovermode': 'x unified'
+                    }
+                ),
+            )
+        with dmc.Stack(gap=10):
+            yield dmc.Text('Fit length-of-stay distributions:', fw=700, size='lg')
+            yield dcc.Markdown('''\
+Selecting "Common distributions only" will attempt only the common distribution
+types as defined by the
+[`fitter`](https://fitter.readthedocs.io/en/latest/faqs.html#what-are-the-distributions-available)
+Python module.  To reduce computation time, it is recommended to leave this
+option checked.''', style={'font-size': 'small'})
+            with dmc.Group(align='start'):
+                yield dmc.Button(
+                    'Fit LoS distributions',
+                    id='step3-button-fit-los'
+                )
+                yield dmc.Checkbox(
+                    id='step3-checkbox-fit-common-only',
+                    label='Common distributions only',
+                    checked=True,
+                    size='md',
+                    mt='0.3rem'
+                )
+        with dmc.Box(id='step3-loading', pos='relative'):
+            yield dmc.LoadingOverlay(
+                id='step3-loading',
+                loaderProps={"color": "red", "size": "md"},
+                overlayProps={"radius": "sm", "blur": 2},
+                visible=False
+            )
+            yield dmc.Box(id='step3-box-results-placeholder', h=200, w=100, display='none')
+            yield dmc.Box(id='step3-box-results', display='none')
+    return ret
+# endregion
+
+
 # region callbacks
-#
+@callback(
+    Output('step3-text-starttime-mode', 'children'),
+    Input('store-appdata', 'data'),
+)
+def start_mode_msg(app_data: dict[str, Any]):
+    """Show which mode is used for the start time of hospital-acquired infections."""
 
-# Go back to Step 2: Arrival modelling.
-clientside_callback(
-    """(step, state) => state - 1""",
-    Output(ID_STEPPER, "active", allow_duplicate=True),
-    Input(ID_STEPPER_BTN_3_TO_2, "n_clicks"),
-    State(ID_STEPPER, "active"),
+    try:
+        starttime_option = app_data['step2']['starttime_option']
+    except KeyError as e:
+        raise dash.exceptions.PreventUpdate from e
+
+    if starttime_option == 'FirstPosCollected':
+        return 'Using time of first postive test as start time for hospital-acquired infections, ' \
+            'and admission time for all other infections.  Go back to Step 2 to change this.'
+
+    return 'Using admission time as start time for all cases, including ' \
+        'hospital-acquired infections.    Go back to Step 2 to change this.'
+
+
+@callback(
+    Output(ID_GRAPH, 'figure', allow_duplicate=True),
+    Input('stepper', 'active'),  # current step
+    State('store-appdata', 'data'),
     prevent_initial_call=True
 )
+def render_arrivals_graph(
+    active_step: int,
+    app_data: dict[str, Any]
+):
+    """Plot daily arrivals."""
+
+    if active_step != 2:
+        raise dash.exceptions.PreventUpdate
+
+    disease_name: str = app_data['step1']['disease_name']
+    starttime_option = app_data['step2']['starttime_option']
+
+    # TODO: extract duplicate code for plotting arrivals & 7-day average
+    # (Steps 2 and 3)
+
+    patched_fig = Patch()
+    patched_fig['layout']['title']['text'] = f'{disease_name} cases by start date'
+    patched_fig['data'] = []  # reset plots
+
+    # Extract start dates of patients
+    stays_df = pd.DataFrame.from_dict(app_data['step1']['stays_df'], orient='tight')
+    start_date_df = start_dates(stays_df, option=starttime_option)
+
+    # Daily arrivals
+    patched_fig['data'].append(
+        go.Scatter(
+            x=start_date_df.index,
+            y=start_date_df.num_cases,
+            name='Count',
+            line={'width': 0.5}
+        )
+    )
+
+    # 7-day rolling average
+    patched_fig['data'].append(
+        go.Scatter(
+            x=start_date_df.index,
+            y=start_date_df.rolling_avg,
+            name='7-day rolling average',
+            # Show a short name and only 4 decimal places for the rolling average
+            hovertemplate='7-day avg.: %{y:.4f}<extra></extra>',
+            line={'width': 1}
+        )
+    )
+
+    return patched_fig
 
 
 @callback(
-    Output(ID_STEPPER, "active", allow_duplicate=True),
-    Output(ID_STORE_APPDATA, "data", allow_duplicate=True),
-    Input(ID_STEPPER_BTN_3_TO_4, "n_clicks"),
-    State(ID_STORE_APPDATA, "data"),
-    State(ID_STEPPER, "active"),
-    State(ID_SELECT_PAEDS_FIT, 'value'),
-    State(ID_SELECT_ADULT_FIT, 'value'),
-    State(ID_SELECT_SENIOR_FIT, 'value'),
-    State(ID_STORE_PAEDS_FIT, 'data'),
-    State(ID_STORE_ADULT_FIT, 'data'),
-    State(ID_STORE_SENIOR_FIT, 'data'),
+    Output('step3-box-results', 'children'),
+    Output('step3-store', 'data'),
+    Input('step3-button-fit-los', 'n_clicks'),
+    State('step3-dateinput-los-start', 'value'),
+    State('step3-dateinput-los-end', 'value'),
+    State('step3-textinput-age-groups', 'value'),
+    State('step3-checkbox-fit-common-only', 'checked'),
+    State('store-appdata', 'data'),
+    running=[
+        (Output('step3-loading', 'visible'), True, False),
+        (Output('step3-box-results-placeholder', 'display'), None, 'none'),
+        (Output('step3-box-results', 'display'), 'none', None)
+    ],
     prevent_initial_call=True
 )
-def stepper_next(_, data, curr_state,
-                 seleted_dist_paeds, selected_dist_adult, selected_dist_senior,
-                 dists_paeds, dists_adult, dists_senior):
-    """Process app data for Step 2 and proceed to Step 3."""
+@composition
+def fit_los(_,
+            start_date: str, end_date: str,
+            age_breakpoints: str, common_only: bool,
+            app_data: dict[str, Any]):
+    """Fit LoS distributions to the defined age groups.  Returns either a `dmc.Stack` component
+    for displaying the results or a `dmc.Alert` with an error message.
 
-    # Error handling -- this should not trigger, so just return no_update and
-    # don't worry about showing error messages
-    if not seleted_dist_paeds or not selected_dist_adult or not selected_dist_senior:
-        return dash.no_update, dash.no_update
+    `age_breakpoints` should be a comma-delimited list of integers, e.g. "16,65" defines
+    the age groups 0-15, 16-64, 65+.
 
-    new_data = deepcopy(data)
-    new_data['completed'] = 3
+    If `common_only` is True, only the most common distribution types as defined in the `fitter`
+    module are checked.
+    """
 
-    los_df = load_los(data['step_1']['los_data'])
-    age_dist = {
-        'paeds': np.mean(los_df.Age < 16),
-        'adult': np.mean((los_df.Age >= 16) & (los_df.Age < 65)),
-        'senior': np.mean(los_df.Age >= 65),
-    }
+    try:
+        starttime_option = app_data['step2']['starttime_option']
+        start = pd.to_datetime(start_date, format='ISO8601')
+        end = pd.to_datetime(end_date, format='ISO8601')
+        assert start < end, 'Start date must be before end date.'
 
-    new_data['step_3'] = {
-        'selected_dists': {
-            'paeds': seleted_dist_paeds,
-            'adult': selected_dist_adult,
-            'senior': selected_dist_senior,
-        },
-        'dists': {
-            'paeds': dists_paeds,
-            'adult': dists_adult,
-            'senior': dists_senior,
-        },
-        'age_dist': age_dist
-    }
+        age_groups = get_age_groups(age_breakpoints)
 
-    return curr_state + 1, new_data
+        stays_df = pd.DataFrame.from_dict(app_data['step1']['stays_df'], orient='tight')
+        stays_df = stays_df.assign(
+            Admission=pd.to_datetime(stays_df.Admission, format='ISO8601'),
+            Discharge=pd.to_datetime(stays_df.Discharge, format='ISO8601'),
+            ReAdmission=pd.to_datetime(stays_df.ReAdmission, format='ISO8601'),
+            ReAdmissionDischarge=pd.to_datetime(stays_df.ReAdmissionDischarge, format='ISO8601'),
+            FirstPosCollected=pd.to_datetime(stays_df.FirstPosCollected, format='ISO8601'),
+        )
 
+        # Adjust start dates for hospital-acquired infections based on `starttime_option`
+        df = stays_df.copy()
+        df = df.assign(Start=df.Admission)
+        if starttime_option == 'FirstPosCollected':
+            df.loc[df.Acquisition.str.startswith('Hospital'), 'Start'] = \
+                df.loc[df.Acquisition.str.startswith('Hospital'), 'FirstPosCollected']
 
-# Disable the "Next button if any inputs are missing."
-clientside_callback(
-    """(v1, v2, v3) => (!v1 || !v2 || !v3)""",
-    Output(ID_STEPPER_BTN_3_TO_4, 'disabled'),
-    Input(ID_SELECT_PAEDS_FIT, 'value'),
-    Input(ID_SELECT_ADULT_FIT, 'value'),
-    Input(ID_SELECT_SENIOR_FIT, 'value'),
-)
+        # Filter df by date range
+        df = df.query('Start >= @start and Start <= @end')
+        df = df.loc[df.Discharge.notna()]
+
+        len_all = len(df)
+
+        # For each age group, generate fit parameters and Plotly graph object
+        for group in age_groups:
+            query = group['query']
+            group_df = df.query(query)
+            assert not group_df.empty, \
+                f'No patients found for age group ({query}).'
+            assert len(group_df) >= 10, \
+                f'Fewer than 10 patients found for age group ({query}); ' \
+                f'fitting not attempted.'
+            dist_type, dist_params, fitted_plot = fit_los_helper(group_df, common_only)
+
+            # Append results to the group's dict object
+            group.update({
+                'ratio': len(group_df) / len_all,
+                'dist_type': dist_type,
+                'dist_params': dist_params,
+                'fit_plot': fitted_plot
+            })
+
+        # Create a DMC Stack to display the results
+        with dmc.Stack(gap=5) as ret:
+            yield dmc.Text('LoS fitting results:', size='lg', fw=700)
+            for group in age_groups:
+                age_group = group['query'].replace('>=', '≥').replace('<=', '≤')
+                yield dmc.Text(
+                    f"Age group: {age_group}",
+                    size='md', fw=700
+                )
+                yield dmc.Text(
+                    f"Fitted distribution: {group['dist_type']}"
+                )
+                params = {k: round(v, 4) for k, v in group['dist_params'].items()}
+                yield dmc.Text(
+                    f"Parameters: {params}"
+                )
+                yield img_from_bytes(
+                    group['fit_plot'],
+                    style={'max-width': '70%', 'height': 'auto'}
+                )
+                yield dmc.Space(h=10)
+
+        # Create the data to store in the step 3 store
+        step3_data = {
+            'start_date': start.isoformat(),
+            'end_date': end.isoformat(),
+            # Remove the 'fit_plot' key from each result to avoid storing large images
+            'age_groups': [{k: v for k, v in group.items() if k != 'fit_plot'}
+                           for group in age_groups]
+        }
+
+        return ret, step3_data
+
+    except AssertionError as e:
+        alert = dmc.Alert(
+            f'Error fitting LoS distributions: {e}',
+            color='red',
+            title=dmc.Text(
+                'Error!',
+                fw=700, size='lg'
+            ),
+            id='step3-alert-fit-los-error'
+        )
+
+        # Clear the Step 3 store as the fitting failed, this prevents stale data from being used
+        # in subsequent steps.
+        return alert, None
 
 
 @callback(
-    Output(ID_GRAPH_PAEDS, 'figure', allow_duplicate=True),
-    Output(ID_GRAPH_ADULT, 'figure', allow_duplicate=True),
-    Output(ID_GRAPH_SENIOR, 'figure', allow_duplicate=True),
-    Input(ID_STEPPER, 'active'),
-    State(ID_STORE_APPDATA, 'data'),
+    Output('stepper', 'active', allow_duplicate=True),
+    Input('btn-stepper-3-to-2', 'n_clicks'),
+    State('stepper', 'active'),
     prevent_initial_call=True
 )
-def render_patient_arr_graph(active_step, app_data: dict):
-    """Render the LoS graphs for the three age groups."""
-
-    if active_step != 2:  # Step 3
-        return dash.no_update
-
-    los_data = app_data['step_1']['los_data']
-    los_df = load_los(los_data)
-
-    # See: https://dash.plotly.com/partial-properties#using-patches-on-multiple-outputs
-    paeds_figure = Patch()
-    adults_figure = Patch()
-    seniors_figure = Patch()
-
-    paeds_figure['data'] = []
-    adults_figure['data'] = []
-    seniors_figure['data'] = []
-
-    paeds_figure['data'].append(
-        go.Violin(x=los_df.loc[los_df.Age < 16, 'LOS_Total'], **GO_OPTS)
-    )
-
-    adults_figure['data'].append(
-        go.Violin(x=los_df.loc[(los_df.Age >= 16) & (los_df.Age < 65), 'LOS_Total'], **GO_OPTS)
-    )
-
-    seniors_figure['data'].append(
-        go.Violin(x=los_df.loc[los_df.Age >= 65, 'LOS_Total'], **GO_OPTS)
-    )
-
-    return paeds_figure, adults_figure, seniors_figure
+def stepper_back(_, current_step: int):
+    """Go back to the previous step."""
+    return current_step - 1  # 1-based to 0-based numbering
 
 
 @callback(
-    Output(ID_TABLE_PAEDS_FIT, 'data'),
-    Output(ID_SELECT_PAEDS_FIT, 'data'),
-    Output(ID_SELECT_PAEDS_FIT, 'value'),
-    Output(ID_OVERLAY_PAEDS_FIT, 'visible'),
-    Output(ID_STORE_PAEDS_FIT, 'data'),
-    Input(ID_STEPPER, 'active'),
-    State(ID_STORE_APPDATA, 'data'),
-    prevent_initial_call=True,
-    background=True,
-    manager=bg_manager
+    Output('stepper', 'active', allow_duplicate=True),
+    Output('store-appdata', 'data', allow_duplicate=True),
+    Output('modal-validation-error', 'opened', allow_duplicate=True),
+    Output('text-validation-error', 'children', allow_duplicate=True),
+    Input('btn-stepper-3-to-4', 'n_clicks'),
+    State('stepper', 'active'),
+    State('step3-store', 'data'),
+    State('store-appdata', 'data'),
+    prevent_initial_call=True
 )
-def fit_los_paeds(active_step, app_data: dict):
-    """Fit LoS distributions to the paeds patient data."""
-    if active_step != 2:  # Step 3
-        return dash.no_update, dash.no_update, dash.no_update, True, dash.no_update
+def stepper_next(_, current_step: int, step_data: dict[str, Any], app_data: dict[str, Any]):
+    """Validate the app state and proceed to the next step."""
 
-    los_data = app_data['step_1']['los_data']
-    los_stats, dists = fit_los(los_data, 'paeds')
-    return los_stats, [x[0] for x in los_stats['body']], None, False, dists
+    # Ensure that the step data is present; this should contain metadata and fitted LoS
+    # distributions for each age group.
+    if not step_data:
+        return current_step, dash.no_update, True, \
+            'No LoS fitting results found.  Please fit the LoS distributions first.'
 
+    # Update the main data store for the web app
+    # and compare old and new data (using sort_keys=True to ensure keys are in same order.)
+    # If data changed, discard all steps after the current step
+    old_data_json = json.dumps(app_data, sort_keys=True)
+    app_data['step3'] = step_data
+    data_json = json.dumps(app_data, sort_keys=True)
+    if data_json != old_data_json:
+        app_data = {f'step{n}': app_data[f'step{n}'] for n in (1, 2, 3)}
+    return current_step + 1, app_data, False, ''
 
-@callback(
-    Output(ID_TABLE_ADULT_FIT, 'data'),
-    Output(ID_SELECT_ADULT_FIT, 'data'),
-    Output(ID_SELECT_ADULT_FIT, 'value'),
-    Output(ID_OVERLAY_ADULT_FIT, 'visible'),
-    Output(ID_STORE_ADULT_FIT, 'data'),
-    Input(ID_STEPPER, 'active'),
-    State(ID_STORE_APPDATA, 'data'),
-    prevent_initial_call=True,
-    background=True,
-    manager=bg_manager
-)
-def fit_los_adult(active_step, app_data: dict):
-    """Fit LoS distributions to the adult (non-senior) patient data."""
-    if active_step != 2:  # Step 3
-        return dash.no_update, dash.no_update, dash.no_update, True, dash.no_update
-
-    los_data = app_data['step_1']['los_data']
-    los_stats, dists = fit_los(los_data, 'adult')
-    return los_stats, [x[0] for x in los_stats['body']], None, False, dists
-
-
-@callback(
-    Output(ID_TABLE_SENIOR_FIT, 'data'),
-    Output(ID_SELECT_SENIOR_FIT, 'data'),
-    Output(ID_SELECT_SENIOR_FIT, 'value'),
-    Output(ID_OVERLAY_SENIOR_FIT, 'visible'),
-    Output(ID_STORE_SENIOR_FIT, 'data'),
-    Input(ID_STEPPER, 'active'),
-    State(ID_STORE_APPDATA, 'data'),
-    prevent_initial_call=True,
-    background=True,
-    manager=bg_manager
-)
-def fit_los_senior(active_step, app_data: dict):
-    """Fit LoS distributions to the senior patient data."""
-    if active_step != 2:  # Step 3
-        return dash.no_update, dash.no_update, dash.no_update, True, dash.no_update
-
-    los_data = app_data['step_1']['los_data']
-    los_stats, dists = fit_los(los_data, 'senior')
-    return los_stats, [x[0] for x in los_stats['body']], None, False, dists
-#
 # endregion
 
 
 # region helpers
-#
-def load_los(los_data):
-    """Load LoS data from the Dash store into a pandas DataFrame."""
-    los_df = pd.DataFrame.from_dict(los_data, orient='tight')
-    los_df = los_df.loc[:, ['Age', 'Admission', 'Discharge', 'ReAdmission', 'ReAdmissionDisch']]
-    los_df = los_df.assign(
-        Admission=pd.to_datetime(los_df.Admission, format='ISO8601'),
-        Discharge=pd.to_datetime(los_df.Discharge, format='ISO8601'),
-        ReAdmission=pd.to_datetime(los_df.ReAdmission, format='ISO8601'),
-        ReAdmissionDisch=pd.to_datetime(los_df.ReAdmissionDisch, format='ISO8601'),
-    )
-    los_df = los_df\
-        .assign(LOS=los_df.Discharge - los_df.Admission,
-                LOS_ReAdmission=los_df.ReAdmissionDisch - los_df.ReAdmission)\
-        .fillna({'LOS_ReAdmission': pd.Timedelta(0)})
-    los_df = los_df.assign(LOS_Total=(los_df.LOS + los_df.LOS_ReAdmission) / DAY)
-    return los_df
+def get_age_groups(age_breakpoints: str):
+    """Generate age group infomation, i.e. bounds and query strings, from a comma-delimited string,
+    e.g. '16,65' generates the [0,16), [16,65), and [65, inf) age groups."""
+
+    # Validate str input
+    age_breakpoints = '' if not age_breakpoints else age_breakpoints  # Handle None
+
+    regex = r'^\d+(,\d+)*$'
+    assert re.fullmatch(regex, age_breakpoints) is not None, \
+        'Invalid input.  Expected a string of integers delimited by commas.'
+
+    # Empty string case: single age group
+    if age_breakpoints == '':
+        return [{
+            'lower': 0,
+            'upper': None,
+            'query': "Age >= 0"
+        }]
+
+    # Split str by comma and generate a dict for each age group
+    age_breakpoints = age_breakpoints.split(',')
+    age_breakpoints = [int(age) for age in age_breakpoints]
+
+    assert all(x < y for x, y in pairwise(age_breakpoints)), \
+        'Age breakpoints must be in strictly ascending order with no duplicates.'
+
+    pairs = list(pairwise([0] + age_breakpoints + [None]))
+    return [
+        {
+            'lower': pair[0],
+            'upper': pair[1],
+            'query': f"Age >= {pair[0]}{f' and Age < {pair[1]}' if pair[1] is not None else ''}"
+        }
+        for pair in pairs
+    ]
 
 
-def get_params(dist_name):
-    """Get the parameter names for a given distribution."""
-    # Inspired by the code for Fitter.get_best()
-    d = getattr(stats, dist_name)
-    return (d.shapes + ", loc, scale").split(", ") if d.shapes else ["loc", "scale"]
+def img_from_bytes(img_bytes: bytes, **kwargs):
+    """Return a dash.html.Img component from a bytes object."""
+    encoded = b64encode(img_bytes).decode('utf-8')
+    src = f"data:image/png;base64,{encoded}"
+    return dmc.Image(src=src, **kwargs)
 
 
-def fit_los(los_data, group: str):
-    """Fit an LoS distribution."""
+def fit_los_helper(df: pd.DataFrame, common_only: bool):
+    """Fit LoS distributions to the given DataFrame.
 
-    # Load data and select age group
-    los_df = load_los(los_data)
-    if group == 'paeds':
-        los = los_df.loc[los_df.Age < 16, 'LOS_Total']
-    elif group == 'adult':
-        los = los_df.loc[(los_df.Age >= 16) & (los_df.Age < 65), 'LOS_Total']
-    elif group == 'senior':
-        los = los_df.loc[los_df.Age >= 65, 'LOS_Total']
-    else:
-        raise ValueError(f'Unexpected value for LoS group: {group}')
+    Returns the distribution type, parameters, and a base64-encoded image of the fitted
+    distribution plot (as a str).
+    """
+
+    # Compute total length of stay (LoS)
+    df = df.assign(LoS=(df.Discharge - df.Admission) / pd.Timedelta(days=1))
+    df = df.assign(ReLoS=(df.ReAdmissionDischarge - df.ReAdmission) / pd.Timedelta(days=1))
+    df.ReLoS = df.ReLoS.fillna(0)
+    df = df.assign(TotalLoS=df.LoS + df.ReLoS)
+    los = df.TotalLoS.to_numpy()
 
     # Remove outliers
-    los = los[np.abs(zscore(los)) < 3]
+    filtered_los = los[abs(zscore(los)) <= 3]
 
-    # Fit distributions
-    f = Fitter(los, timeout=10)
-    f.fit()
+    # Fit distributions using fitter
+    f = fitter.Fitter(
+        filtered_los,
+        distributions=COMMON_DISTS if common_only else None  # None = default (all distributions)
+    )
+    # Since the fitter module is very verbose, we mute its warnings.
+    with shutup.mute_warnings:
+        f.fit(max_workers=1)
 
-    # Distribution statistics sorted by sum of squared errors
+    # Sort results by sum squared error (SSE) and compute the distibution/empirical means and
+    # standard deviations
     fit_df = f.df_errors.loc[
         np.isfinite(f.df_errors.sumsquare_error),
         ['sumsquare_error', 'aic', 'bic', 'ks_pvalue']
@@ -397,49 +466,88 @@ def fit_los(los_data, group: str):
         'sumsquare_error'
     ).assign(
         dist_mean=np.nan,
-        dist_std=np.nan
+        dist_std=np.nan,
+        data_mean=filtered_los.mean(),
+        data_std=filtered_los.std()
     )
 
-    # Filter results by standard deviation
-    s = np.std(los)
+    # Get the distribution means and standard deviations for each fitted distribution.
+    with shutup.mute_warnings:
+        for dist_name in fit_df.index:
+            dist = getattr(stats, dist_name)(*f.fitted_param[dist_name])
+            fit_df.loc[dist_name, 'dist_mean'] = dist.mean()
+            fit_df.loc[dist_name, 'dist_std'] = dist.std()
 
-    for dist_name in fit_df.index:
-        dist = getattr(stats, dist_name)(*f.fitted_param[dist_name])
-        fit_df.loc[dist_name, 'dist_mean'] = dist.mean()
-        fit_df.loc[dist_name, 'dist_std'] = dist.std()
-    fit_df = fit_df.loc[
-        (fit_df.dist_mean > 0) & (fit_df.dist_std > 0.75 * s) & (fit_df.dist_std < 1.5 * s)
-    ]
+    # Get the ratios of the distribution means and stds to the empirical means and stds
+    fit_df = fit_df.assign(
+        mean_ratio=fit_df.dist_mean / fit_df.data_mean,
+        std_ratio=fit_df.dist_std / fit_df.data_std,
+    )
 
-    # Keep top 5 only
-    fit_df = fit_df[:5].reset_index(names='Distribution')
+    # Filter out distributions with NaN statistics
+    fit_df = fit_df.dropna(axis=0, how='any')
 
-    fit_df.sumsquare_error = fit_df.sumsquare_error.round(6)
-    fit_df.aic = fit_df.aic.round(3)
-    fit_df.bic = fit_df.bic.round(3)
-    fit_df.ks_pvalue = fit_df.ks_pvalue.round(5)
-    fit_df.dist_mean = fit_df.dist_mean.round(4)
-    fit_df.dist_std = fit_df.dist_std.round(4)
+    # Filter out distributions where the mean or std ratio is not close to 1
+    fit_df = fit_df.query('0.95 < mean_ratio < 1.05 and 0.9 < std_ratio < 1.1')\
+        .sort_values(by='sumsquare_error')
 
-    # Rename columns
-    fit_df.columns = [
-        'Distribution',
-        'Σ(error²)',
-        'AIC',
-        'BIC',
-        'KS p-value',
-        'Mean',
-        'St. dev.'
-    ]
+    assert not fit_df.empty, \
+        'Could not get a good fit to the LoS data.'
 
-    data = {
-        'head': fit_df.columns.to_list(),
-        'body': fit_df.to_numpy().tolist()
-    }
-    dists = {
-        n: dict(zip(get_params(n), f.fitted_param[n]))
-        for n in fit_df.Distribution
-    }
-    return data, dists
-#
+    # Get the best distribution type and parameters
+    best_fit_type = str(fit_df.index[0])
+
+    # Create a new Fitter object with just the best distribution type
+    f2 = fitter.Fitter(filtered_los, distributions=[best_fit_type])
+    f2.fit(max_workers=1)
+
+    # Get the fitted parameters for the best distribution type
+    best_fit_params = dict(zip(get_params(best_fit_type), f2.fitted_param[best_fit_type]))
+
+    # Create a figure with the fitted and empirical distributions
+    png_encoded = fit_plot(f2)
+
+    return (
+        best_fit_type,
+        best_fit_params,
+        png_encoded
+    )
+
+
+def get_params(dist_name):
+    """Get the parameters for the given distribution name.  The distribution name should be
+    a string matching the name of a distribution in `scipy.stats`.
+
+    Inspired by the code for `Fitter.get_best()`.
+    """
+    d: stats.rv_continuous = getattr(stats, dist_name)
+    # d.shapes is a string of parameter names, e.g. 'a, b'.
+    # Add 'loc' and 'scale' to the list of parameters.
+    return (d.shapes + ", loc, scale").split(", ") if d.shapes else ["loc", "scale"]
+
+
+def fit_plot(f: fitter.Fitter):
+    """Create a figure with the fitted and empirical distributions.  Returns a bytes object
+    containing the figure image.
+    """
+    # Create and decorate the figure
+    plt.rcParams.update({'font.size': 12})  # Set font size for matplotlib
+    plt.figure(figsize=(10, 5))
+    f.hist()
+    f.plot_pdf()
+    plt.legend(fontsize='11', loc='upper right')
+    plt.title('Fitted distribution')
+    plt.xlabel('Length of stay, days')
+    plt.ylabel('Distribution density')
+
+    # Save the figure to a bytes object
+    io = BytesIO()
+    plt.tight_layout(pad=1)
+    plt.savefig(io, format='png')
+    io.seek(0)
+    png_bytes = io.read()
+    plt.close()  # Close the figure to free memory
+
+    # Return the image bytes
+    return png_bytes
 # endregion

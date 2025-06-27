@@ -14,8 +14,11 @@ wheels/
 .venv
 
 # Protect possibly private data
-data/
-!data/public
+**/data/
+!**/data/public
+
+**/assets/*.xlsx
+!**/assets/*_example.xlsx
 
 # Python diskcache
 cache/
