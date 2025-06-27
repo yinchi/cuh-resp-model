@@ -68,13 +68,7 @@ def stack():
             yield dcc.Markdown('''\
 Enter a list of age breakpoints, separated by commas.  For example, `16,65` creates three
 age groups, 0-15, 16-64, and 65+.  Leaving the input below blank creates a single age group
-for all patients.
-
-Selecting "Common distributions only" will attempt only the common distribution types as defined
-by the
-[`fitter`](https://fitter.readthedocs.io/en/latest/faqs.html#what-are-the-distributions-available)
-Python module.  To reduce computation time, it is recommended to leave this option checked.
-''', style={'font-size': 'small'})
+for all patients.''', style={'font-size': 'small'})
             yield dmc.TextInput(
                 id='step3-textinput-age-groups',
                 label='Age group breakpoints',
@@ -113,6 +107,12 @@ Python module.  To reduce computation time, it is recommended to leave this opti
             )
         with dmc.Stack(gap=10):
             yield dmc.Text('Fit length-of-stay distributions:', fw=700, size='lg')
+            yield dcc.Markdown('''\
+Selecting "Common distributions only" will attempt only the common distribution
+types as defined by the
+[`fitter`](https://fitter.readthedocs.io/en/latest/faqs.html#what-are-the-distributions-available)
+Python module.  To reduce computation time, it is recommended to leave this
+option checked.''', style={'font-size': 'small'})
             with dmc.Group(align='start'):
                 yield dmc.Button(
                     'Fit LoS distributions',
@@ -272,6 +272,8 @@ def fit_los(_,
         df = df.query('Start >= @start and Start <= @end')
         df = df.loc[df.Discharge.notna()]
 
+        len_all = len(df)
+
         # For each age group, generate fit parameters and Plotly graph object
         for group in age_groups:
             query = group['query']
@@ -285,6 +287,7 @@ def fit_los(_,
 
             # Append results to the group's dict object
             group.update({
+                'ratio': len(group_df) / len_all,
                 'dist_type': dist_type,
                 'dist_params': dist_params,
                 'fit_plot': fitted_plot
@@ -317,8 +320,8 @@ def fit_los(_,
             'start_date': start.isoformat(),
             'end_date': end.isoformat(),
             # Remove the 'fit_plot' key from each result to avoid storing large images
-            'results': [{k: v for k, v in group.items() if k != 'fit_plot'}
-                        for group in age_groups]
+            'age_groups': [{k: v for k, v in group.items() if k != 'fit_plot'}
+                           for group in age_groups]
         }
 
         return ret, step3_data
