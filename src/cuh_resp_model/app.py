@@ -38,10 +38,11 @@ def layout():
         with dmc.AppShell(
             None,
             header={"height": "90"},
+            footer={"height": "40"},
             padding="md",
-            miw=1200
+            miw=1235
         ):
-            with dmc.AppShellHeader(None, miw=1200):
+            with dmc.AppShellHeader(None, miw=1235):
                 with dmc.Group(
                     justify="space-between",
                     style={"flex": 1},
@@ -62,7 +63,7 @@ def layout():
                                     yield DashIconify(
                                         icon="material-symbols:home-rounded", height=20)
                                     yield dmc.Text(f"{NBSP}{NBSP}Home", fw=700)
-                            with dmc.Anchor(None, href="/about", underline="never",
+                            with dmc.Anchor(None, href="/about", target='_blank', underline="never",
                                             style={"color": "var(--mantine-color-text)"}):
                                 with dmc.Center():
                                     yield DashIconify(
@@ -71,7 +72,7 @@ def layout():
                             yield theme_toggle()
             with dmc.AppShellMain(None, w=1200):
                 yield dash.page_container
-            with dmc.AppShellFooter(None, miw=1200):
+            with dmc.AppShellFooter(None, miw=1235):
                 with dmc.Group(
                     justify="space-between",
                     style={"flex": 1},
