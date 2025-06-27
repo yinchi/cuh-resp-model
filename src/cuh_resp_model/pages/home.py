@@ -5,7 +5,7 @@ import dash_mantine_components as dmc
 from dash import dcc
 from dash_compose import composition
 
-from cuh_resp_model.components import step1, step2, step3
+from cuh_resp_model.components import step1, step2, step3, step4
 
 dash.register_page(__name__, path="/")
 
@@ -23,6 +23,7 @@ def layout():
             yield step1.stepper_step()
             yield step2.stepper_step()
             yield step3.stepper_step()
+            yield step4.stepper_step()
         yield dcc.Store(id='store-appdata', data={})
         with dmc.Modal(title='Error', id='modal-validation-error', opened=False,
                        styles={
