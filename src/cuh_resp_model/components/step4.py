@@ -1,9 +1,9 @@
 """Main module for Step 4 of the stepper: Simulation."""
 
+import json
 import zipfile
 from copy import deepcopy
 from io import BytesIO, StringIO
-from pprint import pformat
 from time import sleep
 
 import dash_mantine_components as dmc
@@ -272,7 +272,7 @@ def download_config(_, app_data: dict[str, any]):
     del data['step1']['occupancy_df']
 
     # Convert the app data to JSON and write it to a StringIO object.
-    config_json = pformat(data, indent=2, compact=True, sort_dicts=False, width=100)
+    config_json = json.dumps(data, sort_keys=False)
     config_file = StringIO(config_json)
 
     # Convert stays_df to a Parquet file in memory.
