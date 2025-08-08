@@ -487,8 +487,9 @@ def fit_los_helper(df: pd.DataFrame, common_only: bool):
                 fit_df.loc[dist_name, 'dist_mean'] = dist.mean()
                 fit_df.loc[dist_name, 'dist_std'] = dist.std()
             except Exception:
-                pass  # If the mean or std cannot be computed, leave both as NaN;
-                      # distribution will be dropped later.
+                # If the mean or std cannot be computed, leave both as NaN;
+                # distribution will be dropped later.
+                pass
 
     # Get the ratios of the distribution means and stds to the empirical means and stds
     fit_df = fit_df.assign(

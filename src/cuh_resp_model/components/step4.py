@@ -111,7 +111,8 @@ def stack():
                 id='step4-multiselect-age-groups',
                 label="Age groups to include in plot:",
                 description="Plot will show daily total occupancy for the selected age groups. "
-                            "Use the 'Select all' button to include all age groups or the 'X' at the right side of the dropdown to clear the selection.",
+                            "Use the 'Select all' button to include all age groups or the 'X' at "
+                            "the right side of the dropdown to clear the selection.",
                 clearable=True,
                 value=all_keys,  # Default to all age groups
                 data=all_keys,
@@ -131,8 +132,8 @@ def stack():
                         'width': 1000,
                         'height': 350,
                         'legend': {'yanchor': 'bottom', 'y': 1,
-                                'xanchor': 'left', 'x': 0,
-                                'font_size': 14, 'orientation': 'h'},
+                                   'xanchor': 'left', 'x': 0,
+                                   'font_size': 14, 'orientation': 'h'},
                         'title_font_size': 20,
                         'xaxis': {'tickfont': {'size': 14}},
                         'yaxis': {'tickfont': {'size': 14}},
@@ -241,8 +242,10 @@ def simulate(
             'upper_decile': results_df[key].quantile(0.9, axis=1)
         }).to_dict(orient='tight')
 
-    # Return the results (dmc.Store data, dmc.MultiSelect options) and select all age groups by default.  This triggers a re-render of the graph in another callback.
-    all_keys = [k for k in summaries.keys() if k != 'Total']
+    # Return the results (dmc.Store data, dmc.MultiSelect options) and select
+    # all age groups by default.  This triggers a re-render of the graph in
+    # another callback.
+    all_keys = [k for k in summaries if k != 'Total']
     return summaries, all_keys, all_keys
 
 
@@ -253,7 +256,8 @@ def simulate(
     prevent_initial_call=True
 )
 def select_all_age_groups(_, all_keys: list[str]):
-    """Select all age groups in the MultiSelect component.  Triggered when the 'Select all' button is clicked."""
+    """Select all age groups in the MultiSelect component.  Triggered when the
+    'Select all' button is clicked."""
     return all_keys
 
 
