@@ -20,6 +20,7 @@ from plotly import graph_objects as go
 from scipy import stats
 from scipy.stats import zscore
 
+from cuh_resp_model.cache import bg_manager
 from cuh_resp_model.components.back_next import back_next
 from cuh_resp_model.components.step2 import start_dates
 
@@ -222,11 +223,15 @@ def render_arrivals_graph(
     State('step3-textinput-age-groups', 'value'),
     State('step3-checkbox-fit-common-only', 'checked'),
     State('store-appdata', 'data'),
+    background=True,
+    manager=bg_manager,
     running=[
+        (Output('step3-button-fit-los', 'disabled'), True, False),
         (Output('step3-loading', 'visible'), True, False),
         (Output('step3-box-results-placeholder', 'display'), None, 'none'),
         (Output('step3-box-results', 'display'), 'none', None)
     ],
+    cancel=[Input('stepper', 'active_step')],  # Cancel if active step changes
     prevent_initial_call=True
 )
 @composition
@@ -453,11 +458,14 @@ def fit_los_helper(df: pd.DataFrame, common_only: bool):
         filtered_los,
         distributions=COMMON_DISTS if common_only else None  # None = default (all distributions)
     )
+    print("Common distributions only:", common_only)
+    print("Fitting distributions:", f.distributions)
+
     # Since the fitter module is very verbose, we mute its warnings.
     with shutup.mute_warnings:
-        f.fit(max_workers=1)
+        f.fit(max_workers=-1)
 
-    # Sort results by sum squared error (SSE) and compute the distibution/empirical means and
+    # Sort results by sum squared error (SSE) and compute the distribution/empirical means and
     # standard deviations
     fit_df = f.df_errors.loc[
         np.isfinite(f.df_errors.sumsquare_error),
@@ -475,8 +483,13 @@ def fit_los_helper(df: pd.DataFrame, common_only: bool):
     with shutup.mute_warnings:
         for dist_name in fit_df.index:
             dist = getattr(stats, dist_name)(*f.fitted_param[dist_name])
-            fit_df.loc[dist_name, 'dist_mean'] = dist.mean()
-            fit_df.loc[dist_name, 'dist_std'] = dist.std()
+            try:
+                fit_df.loc[dist_name, 'dist_mean'] = dist.mean()
+                fit_df.loc[dist_name, 'dist_std'] = dist.std()
+            except Exception:
+                # If the mean or std cannot be computed, leave both as NaN;
+                # distribution will be dropped later.
+                pass
 
     # Get the ratios of the distribution means and stds to the empirical means and stds
     fit_df = fit_df.assign(

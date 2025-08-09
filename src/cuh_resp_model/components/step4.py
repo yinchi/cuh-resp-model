@@ -1,10 +1,10 @@
 """Main module for Step 4 of the stepper: Simulation."""
 
+import json
 import zipfile
 from copy import deepcopy
 from io import BytesIO, StringIO
-from pprint import pformat
-from time import sleep
+from typing import Any, Callable
 
 import dash_mantine_components as dmc
 import pandas as pd
@@ -14,6 +14,8 @@ from plotly import graph_objects as go
 
 from cuh_resp_model.cache import bg_manager
 from cuh_resp_model.components.back_next import back_next
+from cuh_resp_model.sim import (gen_plotly, get_quantiles, sim, sim_results_from_dict,
+                                sim_results_to_dict)
 
 ID_GRAPH = {'themed_graph': True, 'name': 'step4-graph-results'}
 
@@ -111,7 +113,8 @@ def stack():
                 id='step4-multiselect-age-groups',
                 label="Age groups to include in plot:",
                 description="Plot will show daily total occupancy for the selected age groups. "
-                            "Use the 'Select all' button to include all age groups or the 'X' at the right side of the dropdown to clear the selection.",
+                            "Use the 'Select all' button to include all age groups or the 'X' at "
+                            "the right side of the dropdown to clear the selection.",
                 clearable=True,
                 value=all_keys,  # Default to all age groups
                 data=all_keys,
@@ -131,8 +134,8 @@ def stack():
                         'width': 1000,
                         'height': 350,
                         'legend': {'yanchor': 'bottom', 'y': 1,
-                                'xanchor': 'left', 'x': 0,
-                                'font_size': 14, 'orientation': 'h'},
+                                   'xanchor': 'left', 'x': 0,
+                                   'font_size': 14, 'orientation': 'h'},
                         'title_font_size': 20,
                         'xaxis': {'tickfont': {'size': 14}},
                         'yaxis': {'tickfont': {'size': 14}},
@@ -169,24 +172,16 @@ def stack():
     cancel=[Input('stepper', 'active_step')]  # Cancel if active step changes
 )
 def simulate(
-    set_progress: callable,
+    set_progress: Callable[[int], Any],
     _,  # n_clicks: int,
     num_reps: int,
     jitter: int,
     app_data: dict[str, any]
 ):
-    """Run the simulation and return the results."""
+    """Run the simulation and return the results.
 
-    # Read stays_df from app_data and fix the data types.
-    # We will use this to compute historical occupancy by age group.
-    stays_df = pd.DataFrame.from_dict(app_data['step1']['stays_df'], orient='tight')
-    stays_df = stays_df.assign(
-        Admission=pd.to_datetime(stays_df['Admission'], format='ISO8601'),
-        Discharge=pd.to_datetime(stays_df['Discharge'], format='ISO8601'),
-        ReAdmission=pd.to_datetime(stays_df['ReAdmission'], format='ISO8601'),
-        ReAdmissionDischarge=pd.to_datetime(stays_df['ReAdmissionDischarge'], format='ISO8601'),
-        FirstPosCollected=pd.to_datetime(stays_df['FirstPosCollected'], format='ISO8601'),
-    )
+    See `cuh_resp_model.sim.simulate_once()` for details on the simulation parameters.
+    """
 
     # Get the scenario from the app data.
     scenario_df = pd.DataFrame.from_dict(app_data['step2']['scenario_df'], orient='tight')
@@ -195,55 +190,60 @@ def simulate(
     )
 
     # Get the age groups from the app data.
-    age_groups = app_data['step3']['age_groups']
+    age_df = pd.DataFrame.from_dict(app_data['step3']['age_groups'], orient='columns')
 
-    results = []
-    for i in range(1, num_reps + 1):
-        # Get a Pandas dataframe with the total daily occupancy for the ward, with
-        # the index being the date and the columns being the age groups.
-        results.append(
-            simulate_once(
-                scenario_df=scenario_df,
-                jitter=jitter / 100,  # Convert percentage to a fraction
-                age_groups=age_groups,
-            )
-        )
+    # Use the 'query' column to get the age group names, e.g. "Age ≥ 0 and Age < 16".
+    # This is used for the MultiSelect component.
+    age_group_names = age_df['query'].tolist()
 
-        # Update the progress bar and text.
-        set_progress((
-            i / num_reps * 100,  # Progress, convert to percentage
-            f'{i}/{num_reps}'  # Text display, e.g. '1/30'
-        ))
+    sim_results = sim(
+        scenario_df=scenario_df,
+        age_df=age_df,
+        n_runs=num_reps,
+        jitter=jitter/100,  # Convert percentage to fraction.
+        extra_days=25,  # TODO: Add control for this in the UI.
+        set_progress=set_progress,
+    )
 
-    # For each age group, concatenate the results from all simulation replications.
-    # The simulation replications are laid out across the columns.
-    results_df = {}
-    keys2 = [group['query'] for group in age_groups]
-    keys = keys2 + ['Total']
-    for key in keys:
-        # Concatenate the results for this age group across all iterations.
-        results_df[key] = pd.concat(
-            [results[i][key] for i in range(num_reps)],
-            axis=1
-        )
-        # Set the column names to be the iteration numbers.
-        results_df[key].columns = [f'Iteration {i + 1}' for i in range(num_reps)]
+    return (
+        sim_results_to_dict(sim_results),
+        age_group_names,
+        age_group_names  # Default to all age groups selected
+    )
 
-    # For each age group, compute summary statistics across all iterations.
-    summaries = {}
-    for key in keys:
-        s = key.replace('>=', '≥').replace('<=', '≤')
-        summaries[s] = pd.DataFrame({
-            'median': results_df[key].median(axis=1),
-            'lower_quartile': results_df[key].quantile(0.25, axis=1),
-            'upper_quartile': results_df[key].quantile(0.75, axis=1),
-            'lower_decile': results_df[key].quantile(0.1, axis=1),
-            'upper_decile': results_df[key].quantile(0.9, axis=1)
-        }).to_dict(orient='tight')
 
-    # Return the results (dmc.Store data, dmc.MultiSelect options) and select all age groups by default.  This triggers a re-render of the graph in another callback.
-    all_keys = [k for k in summaries.keys() if k != 'Total']
-    return summaries, all_keys, all_keys
+@callback(
+    Output(ID_GRAPH, 'figure', allow_duplicate=True),
+    Input('step4-store', 'data'),
+    Input('step4-multiselect-age-groups', 'value'),
+    prevent_initial_call=True
+)
+def graph_results(
+    app_data: dict[str, any],
+    selected_age_groups: list[str]
+):
+    """Generate the graph for the simulation results."""
+
+    def group_sum(dfs, selected_age_groups):
+        """
+        Combine the bed occupancy data for selected age groups into a single series.
+        """
+        return pd.concat(
+            (dfs[g] for g in selected_age_groups),
+            axis=1, join='outer'
+        ).ffill().sum(axis=1)
+
+    if not selected_age_groups or not app_data:
+        # If no age groups are selected or no app data is available, return an empty figure.
+        return go.Figure()
+
+    # Convert the app data to a SimResults object.
+    sim_results = sim_results_from_dict(app_data)
+    q = get_quantiles(
+        list(group_sum(dfs, selected_age_groups) for dfs in sim_results.beds_by_age_list)
+    )
+    fig = gen_plotly(q, title='Bed occupancy for selected age groups')
+    return fig
 
 
 @callback(
@@ -253,7 +253,8 @@ def simulate(
     prevent_initial_call=True
 )
 def select_all_age_groups(_, all_keys: list[str]):
-    """Select all age groups in the MultiSelect component.  Triggered when the 'Select all' button is clicked."""
+    """Select all age groups in the MultiSelect component.  Triggered when the
+    'Select all' button is clicked."""
     return all_keys
 
 
@@ -272,7 +273,7 @@ def download_config(_, app_data: dict[str, any]):
     del data['step1']['occupancy_df']
 
     # Convert the app data to JSON and write it to a StringIO object.
-    config_json = pformat(data, indent=2, compact=True, sort_dicts=False, width=100)
+    config_json = json.dumps(data, sort_keys=False)
     config_file = StringIO(config_json)
 
     # Convert stays_df to a Parquet file in memory.
@@ -324,23 +325,4 @@ def download_config(_, app_data: dict[str, any]):
 def stepper_back(_, current_step: int):
     """Go back to the previous step."""
     return current_step - 1  # 1-based to 0-based numbering
-# endregion
-
-
-# region helpers
-def simulate_once(scenario_df: pd.DataFrame, jitter: float, age_groups: list[dict[str, any]]):
-    """Run a single simulation iteration."""
-    # Placeholder for the actual simulation logic. For now, we just return an empty dict.
-
-    sleep(1)  # Simulate some processing time
-
-    # Return a dummy result with the same structure as the expected output.
-    # Use the query string from each age group as the column name for that group,
-    # e.g. 'Age >= 0 and Age < 16'.
-    return pd.DataFrame(
-        [],
-        index=pd.DatetimeIndex([], name='date'),
-        dtype='int64',
-        columns=[group['query'] for group in age_groups] + ['Total']
-    )
 # endregion

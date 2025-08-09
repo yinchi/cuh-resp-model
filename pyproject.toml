@@ -14,6 +14,7 @@ dependencies = [
     "dash-mantine-components>=1.1",
     "dash[diskcache]==3.0.3",
     "fitter>=1.7.1",
+    "gitpython>=3.1.45",
     "greenlet>=3.2.1",
     "humanize>=4.11.0",
     "nbformat>=5.10.4",
