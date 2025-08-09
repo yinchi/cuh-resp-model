@@ -168,7 +168,7 @@ def sim_once(
     )
 
     # Run until the last date in the scenario DataFrame
-    till = scenario_df['date'].max() + pd.Timedelta(days=extra_days)
+    till = pd.Timestamp(scenario_df['date'].max()) + pd.Timedelta(days=extra_days)
     env.run(till=env.datetime_to_t(till))
 
     # Collect the results for overall bed occupancy
@@ -206,17 +206,24 @@ class SimResults(NamedTuple):
     and occupied beds for each age group in each run."""
 
 
+def df_to_dict(df):
+    df = df.copy()
+    df.index = df.index.map(datetime.isoformat)  # Convert index to ISO format
+    return df.to_dict(orient='dict')['occupied_beds']
+
+
+def dict_to_df(d):
+    df = pd.DataFrame({'occupied_beds': d})
+    df.index = pd.to_datetime(df.index, format='ISO8601')  # Convert index back to datetime
+    return df
+
+
 def sim_results_to_dict(sim_results):
     """
     Convert the overall beds list from sim_results to a dictionary format.
     The index is converted to ISO format for better readability.
     """
-
-    def df_to_dict(df):
-        df = df.copy()
-        df.index = df.index.map(datetime.isoformat)  # Convert index to ISO format
-        return df.to_dict(orient='dict')['occupied_beds']
-
+    
     _overall_beds_list = [
         df_to_dict(df) for df in sim_results.overall_beds_list
     ]
@@ -238,12 +245,6 @@ def sim_results_from_dict(sim_results_dict):
     The index is converted from ISO format back to datetime.
     Inverse of `sim_results_to_dict`.
     """
-
-    def dict_to_df(d):
-        df = pd.DataFrame({'occupied_beds': d})
-        df.index = pd.to_datetime(df.index, format='ISO8601')  # Convert index back to datetime
-        return df
-
     overall_beds_list = [dict_to_df(d) for d in sim_results_dict['overall_beds_list']]
     beds_by_age_list = [
         {g: dict_to_df(d[g]) for g in d} for d in sim_results_dict['beds_by_age_list']
@@ -258,7 +259,7 @@ def sim(
     n_runs: int = 30,
     jitter: float = 0.2,
     extra_days: int = 25,
-    set_progress: Callable[[int], Any] = None
+    set_progress: Callable[[int], Any] | None = None
 ) -> SimResults:
     """Run multiple simulations and collect results.
 
@@ -294,10 +295,11 @@ def sim(
         )
         overall_beds_list.append(beds_df)
         beds_by_age_list.append(beds_by_age)
-        set_progress((
-            (i + 1) / n_runs * 100,  # Progress, convert to percentage
-            f'{i + 1}/{n_runs}'  # Text display, e.g. '1/30'
-        ))
+        if set_progress:
+            set_progress((
+                (i + 1) / n_runs * 100,  # Progress, convert to percentage
+                f'{i + 1}/{n_runs}'  # Text display, e.g. '1/30'
+            ))
 
     return SimResults(
         overall_beds_list=overall_beds_list,
